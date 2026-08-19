@@ -1,0 +1,113 @@
+# AppArmor profile for the Red Queen Sentry container.
+# Profile name: docker-red-queen
+#
+# Load with:
+#   apparmor_parser -r /etc/apparmor.d/docker-red-queen
+#
+# Run the container with:
+#   docker run --rm --security-opt apparmor=docker-red-queen ...
+#
+# This profile enforces least privilege:
+#   - Read-only access to application and Python library paths
+#   - Write access only to /tmp
+#   - Deny access to sensitive host paths (/etc/shadow, /root, /home, /var/log)
+#   - Deny all network access
+#   - Deny ptrace and mount
+
+#include <tunables/global>
+
+profile docker-red-queen flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  # ----- Network: deny all -----
+  deny network,
+  deny network inet,
+  deny network inet6,
+  deny network unix,
+  deny network packet,
+
+  # ----- ptrace: deny -----
+  deny ptrace (read, trace),
+  deny ptrace (tracedby, readby),
+
+  # ----- mount: deny -----
+  deny mount,
+  deny umount,
+
+  # ----- Sensitive host paths: deny -----
+  deny /etc/shadow r,
+  deny /etc/gshadow r,
+  deny /root/** rwklx,
+  deny /home/** rwklx,
+  /home/ r,
+  deny /var/log/** rwklx,
+
+  # ----- Application code: read-only -----
+  /app/** r,
+  /app/ r,
+
+  # ----- Python runtime and libraries: read-only -----
+  /usr/lib/python3.11/** r,
+  /usr/lib/python3.11/ r,
+  /usr/local/lib/python3.11/** r,
+  /usr/local/lib/python3.11/ r,
+  /usr/local/bin/ r,
+  /usr/local/bin/python* rix,
+  /usr/bin/ r,
+  /usr/bin/python* rix,
+
+  # ----- System libs needed by Python/numpy/scikit-learn -----
+  /lib/** r,
+  /lib64/** r,
+  /usr/lib/** r,
+  /etc/ld.so.cache r,
+  /etc/ld.so.conf r,
+  /etc/ld.so.conf.d/** r,
+  /etc/nsswitch.conf r,
+  /etc/passwd r,
+  /etc/group r,
+  /etc/hosts r,
+  /etc/hostname r,
+  /etc/resolv.conf r,
+  /etc/mime.types r,
+  /etc/localtime r,
+  /etc/timezone r,
+
+  # ----- /proc and /sys: read-only minimal -----
+  /proc/** r,
+  /sys/** r,
+  deny /proc/*/mem rwklx,
+  deny /proc/sys/kernel/modprobe rwklx,
+  deny /proc/sysrq-trigger rwklx,
+  deny /proc/kcore rwklx,
+  deny /proc/kallsyms rwklx,
+
+  # ----- /dev: minimal -----
+  /dev/null rw,
+  /dev/zero rw,
+  /dev/urandom rw,
+  /dev/random r,
+  deny /dev/tty rwklx,
+  deny /dev/pts/* rwklx,
+
+  # ----- /tmp: read-write (the only writable area) -----
+  /tmp/** rwkl,
+  /tmp/ rwkl,
+
+  # ----- Signals -----
+  signal (receive) peer=unconfined,
+
+  # ----- Capabilities: deny all dangerous ones -----
+  deny capability sys_admin,
+  deny capability sys_module,
+  deny capability sys_ptrace,
+  deny capability sys_rawio,
+  deny capability sys_chroot,
+  deny capability dac_read_search,
+  deny capability dac_override,
+  deny capability setuid,
+  deny capability setgid,
+  deny capability net_admin,
+  deny capability net_bind_service,
+  deny capability net_raw,
+}

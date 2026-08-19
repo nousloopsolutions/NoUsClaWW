@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "nousclaww"
+version = "0.1.0"
+description = "Local-first, LLM-agnostic autonomous agent stack with epistemic boundary"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "NoUs Loop Solutions LLC"}]
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "httpx>=0.27.0",
+    "pydantic>=2.7.0",
+    "numpy>=1.26.0",
+    "scikit-learn>=1.4.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-cov>=5.0", "pytest-asyncio>=0.23"]
+local = ["ollama>=0.3.0"]
+
+[project.scripts]
+nousclaww = "nousclaww.sidecar.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src", "."]
+include = ["nousclaww*", "sovereign_sockets*", "red_queen_sentry*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"

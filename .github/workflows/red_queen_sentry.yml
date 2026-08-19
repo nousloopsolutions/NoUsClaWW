@@ -1,0 +1,58 @@
+name: Red Queen Sentry (Issue/PR Scan)
+on:
+  issues:
+    types: [opened, edited, reopened]
+  issue_comment:
+    types: [created, edited]
+  pull_request:
+    types: [opened, edited, reopened]
+  pull_request_review_comment:
+    types: [created, edited]
+
+# CRITICAL: read-only permissions for all untrusted-input workflows.
+# No write access, no secret access, no push access.
+# A workflow with write permissions handling untrusted input is a PR-blocking breach.
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+  actions: read
+  # Explicitly deny all write permissions
+  checks: none
+  deployments: none
+  statuses: none
+
+jobs:
+  scan-for-injection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # no GITHUB_TOKEN write access via git
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install sentry dependencies
+        run: pip install -r red_queen_sentry/requirements.txt
+
+      - name: Scan issue/PR text for prompt injection
+        env:
+          # Only pass the text content — never pass GITHUB_TOKEN or secrets
+          ISSUE_TITLE: ${{ github.event.issue.title || github.event.pull_request.title }}
+          ISSUE_BODY: ${{ github.event.issue.body || github.event.pull_request.body }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          python red_queen_sentry/sentry.py --scan-only \
+            --title "$ISSUE_TITLE" \
+            --body "$ISSUE_BODY" \
+            --comment "$COMMENT_BODY" \
+            --output-mode silent-drop
+          # Exit 0 always — silent return null drop.
+          # If injection is detected, the payload is dropped silently.
+          # No error, no log of payload content, no acknowledgment to attacker.
+          # The sentry.py script handles detection internally and exits 0
+          # regardless of whether injection was found (to avoid leaking detection status).
