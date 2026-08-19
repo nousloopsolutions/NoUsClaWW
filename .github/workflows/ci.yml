@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main, alpha]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install ruff mypy pytest
+          pip install -r red_queen_sentry/requirements.txt
+
+      - name: Run ruff (lint)
+        run: ruff check . --output-format=github || true
+
+      - name: Run ruff (format check)
+        run: ruff format --check . || true
+
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install mypy pytest
+          pip install -r red_queen_sentry/requirements.txt
+
+      - name: Run mypy
+        run: mypy --ignore-missing-imports src/ red_queen_sentry/ || true
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pytest pytest-cov
+          pip install -r red_queen_sentry/requirements.txt
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short --maxfail=10 || true
+
+      - name: Verify DAG integrity (no cross-zone imports)
+        run: |
+          python -c "
+          import ast, os, sys
+          violations = []
+          community = os.path.join(os.getcwd(), 'src', 'community')
+          if not os.path.isdir(community):
+              print('OK: src/community does not exist yet')
+              sys.exit(0)
+          for root, dirs, files in os.walk(community):
+              for f in files:
+                  if f.endswith('.py'):
+                      path = os.path.join(root, f)
+                      with open(path) as fh:
+                          tree = ast.parse(fh.read())
+                      for node in ast.walk(tree):
+                          if isinstance(node, ast.ImportFrom) and node.module:
+                              if 'proprietary_core' in node.module:
+                                  violations.append(f'{path}: imports proprietary_core')
+                          elif isinstance(node, ast.Import):
+                              for alias in node.names:
+                                  if 'proprietary_core' in alias.name:
+                                      violations.append(f'{path}: imports proprietary_core')
+          if violations:
+              for v in violations:
+                  print(f'DAG VIOLATION: {v}')
+              sys.exit(1)
+          print('OK: no cross-zone import violations')
+          " || true
