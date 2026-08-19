@@ -82,16 +82,15 @@ This charter binds all agents operating on NoUsClaWW to the following process co
 
 ## 4. Security Rules
 
-- Red Queen 10K: zero breaches, zero tolerance
+- Injection scan: zero tolerance, silent drop of malicious payloads
 - GITHUB_TOKEN: read-only for untrusted-input workflows
 - Docker: non-root (uid 10001), no sudo, no network, read-only filesystem
-- Injection scan: silent drop, no acknowledgment to attacker
 - No secrets in code, ever
 
 ## 5. Branch Protection
 
-- `main`: 2 reviews, 3 CI checks, linear history, no force push
-- `alpha`: 2 reviews, 3 CI checks, linear history, no force push
+- `main`: 2 reviews, 5 CI checks, linear history, no force push
+- `alpha`: 2 reviews, 5 CI checks, linear history, no force push
 - CODEOWNERS: all paths owned by `@nousloopsolutions`
 - Stale reviews dismissed on push
 - Review thread resolution required

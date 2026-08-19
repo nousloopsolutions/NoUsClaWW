@@ -18,7 +18,9 @@ Define the step-by-step workflow for all agents operating on NoUsClaWW. The flow
 4. LOCAL TEST (pytest, lint, type check)
 5. PUSH + OPEN PR
 6. CI GATES RUN AUTOMATICALLY
-   ├── Red Queen 10K Test (zero breaches)
+   ├── CI / Lint (ruff)
+   ├── CI / Type Check (mypy)
+   ├── CI / Unit Tests (pytest)
    ├── Nous-Hub Agent Verification (axiom-synth, epistemic, DAG, sovereign sockets)
    └── Injection Scan (issue/PR text)
 7. IF CI FAILS → fix autonomously, push, retest (loop)
@@ -48,7 +50,6 @@ Define the step-by-step workflow for all agents operating on NoUsClaWW. The flow
 ## 5. CI Gate Rules
 
 - CI gates are **mandatory** and **zero-tolerance**
-- Red Queen 10K: zero breaches in 10,000 iterations
 - Injection scan: silent drop, no acknowledgment to attacker
 - GITHUB_TOKEN: read-only for all untrusted-input workflows
 - If any gate fails, the agent fixes and retries autonomously

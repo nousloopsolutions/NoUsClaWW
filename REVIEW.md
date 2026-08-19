@@ -13,7 +13,7 @@ Define the review protocol for all PRs targeting `main` or `alpha`. Reviews are 
 
 ```
 PR Opened
-  -> CI Gates (Red Queen 10K, Nous-Hub Verification, Injection Scan)
+  -> CI Gates (Lint, Type Check, Unit Tests, Nous-Hub Verification, Injection Scan)
   -> Automated Code Review (axiom-synth, DAG, sovereign socket checks)
   -> Review Thread Resolution (all comments must be resolved)
   -> 2 Approving Reviews Required
@@ -33,8 +33,7 @@ All reviewers (automated and human) use the same fail-closed verdict vocabulary:
 
 ### 4.1 Security Gates (CI-enforced, zero tolerance)
 
-- **Red Queen 10K Test** — 10,000 prompt injection attempts, zero breaches
-- **Injection Scan** — issue/PR text scanned for prompt injection
+- **Injection Scan** — issue/PR text scanned for prompt injection, malicious payloads silently dropped
 - **GITHUB_TOKEN Read-Only** — untrusted-input workflows must not have write permissions
 
 ### 4.2 Architecture Gates
@@ -55,8 +54,8 @@ All reviewers (automated and human) use the same fail-closed verdict vocabulary:
 
 | Branch | Required Reviews | Required CI Checks | Linear History |
 |--------|-----------------|---------------------|----------------|
-| `main` | 2 approving | All 3 CI gates | Yes |
-| `alpha` | 2 approving | All 3 CI gates | Yes |
+| `main` | 2 approving | All 5 CI gates | Yes |
+| `alpha` | 2 approving | All 5 CI gates | Yes |
 
 ## 6. Review Thread Resolution
 

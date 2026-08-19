@@ -23,7 +23,7 @@
 
 | ID | Invariant | Enforcement |
 |----|-----------|-------------|
-| INV-SEC-1 | Red Queen 10K test must have zero breaches | CI gate (zero tolerance) |
+| INV-SEC-1 | Injection scan must pass on all PRs | CI gate (zero tolerance) |
 | INV-SEC-2 | Untrusted-input workflows use read-only GITHUB_TOKEN | CI verification step |
 | INV-SEC-3 | No workflow with write permissions handles issue/PR text | CI check |
 | INV-SEC-4 | Docker containers run as non-root (uid 10001) | CI verification |

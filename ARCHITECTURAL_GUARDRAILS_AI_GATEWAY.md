@@ -19,7 +19,7 @@ All agent operations must respect the six Virtual Severance Domains:
 | 40000 | Macrodata | Data refinement, memory | Read-only via sovereign sockets |
 | 50000 | Elevator | Session wipe, ephemeral context | Enforced by CI, no agent access |
 | 60000 | Rabbit Hole | OAuth gate, MCP rug pull defense | Enforced by Cloudflare Worker |
-| 80000 | Red Queen | CI/CD gatekeeper, 10K test | CI-enforced, no agent bypass |
+| 80000 | Red Queen | CI/CD gatekeeper, injection scanning | CI-enforced, no agent bypass |
 | 90000 | Pool of Tears | Void socket, ignorance mapping | Read-only via sovereign sockets |
 
 ## 3. AI Gateway Guardrails
@@ -136,7 +136,7 @@ CI enforces:
 | Destructive command | Block execution, log breach |
 | DAG violation (cross-zone import) | CI fails, PR returned to builder |
 | Sovereign socket change without ADR | CI warning, review required |
-| 10K test breach | CI fails, zero tolerance, PR blocked |
+| Injection scan breach | CI fails, zero tolerance, PR blocked |
 
 ## 7. Agent Capability Matrix
 

@@ -28,7 +28,7 @@ Enforce strict separation between agent roles to prevent self-review, self-appro
 
 ### Verification Agent (Nous-Hub)
 
-- Runs CI gates: Red Queen 10K, injection scan, axiom-synth checks
+- Runs CI gates: lint, type-check, unit tests, injection scan, axiom-synth checks
 - Verifies DAG integrity, sovereign socket immutability
 - Posts check run results
 - **Cannot** approve PRs or merge
