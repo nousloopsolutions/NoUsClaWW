@@ -140,7 +140,7 @@ Community code may import sovereign sockets but **may never import** proprietary
 
 The Red Queen Sentry (VDS 80000) is NoUsClaWW's security gatekeeper:
 
-- **10K prompt-injection test suite** — 10,000 adversarial prompt-injection attacks run in a Docker container in CI. Every PR must pass with zero breaches.
+- **Prompt-injection scanning** — All PR bodies, issue bodies, and external contributions are scanned for prompt injection and adversarial patterns in CI. Malicious payloads are silently dropped.
 - **Mahalanobis anomaly detection** — Inbound payloads are embedded into a feature space. Outliers (Mahalanobis distance above threshold) are flagged and blocked.
 - **SPRT anomaly detection** — During live execution, the Sequential Probability Ratio Test monitors token usage, response patterns, and timing. A threshold breach triggers immediate session annihilation via VDS 50000.
 

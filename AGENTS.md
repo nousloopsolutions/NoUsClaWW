@@ -36,7 +36,7 @@ NoUsClaWW enforces Safety Through Severance via six Virtual Severance Domains. N
 | 40000 | Macrodata Refinement | PII scrubber + HMAC hash generator |
 | 50000 | The Elevator | Session wipe — ruthless annihilation between tasks |
 | 60000 | The Rabbit Hole | Cloudflare Worker MCP OAuth Gate (stateless) |
-| 80000 | Red Queen's Court | CI/CD security gatekeeper, 10K injection tests, Mahalanobis/SPRT |
+| 80000 | Red Queen's Court | CI/CD security gatekeeper, injection scanning, Mahalanobis/SPRT |
 | 90000 | Pool of Tears | Persistent void socket storage for epistemic gaps |
 
 Full details: [docs/VDS_TOPOLOGY.md](docs/VDS_TOPOLOGY.md)
@@ -165,7 +165,7 @@ The repository is partitioned into three zones with strict import rules.
 
 ### 6.1 Red Queen Sentry Scans All Untrusted Input
 
-Every PR body, issue body, and external contribution is scanned by the Red Queen Sentry (VDS 80000) for prompt injection and adversarial patterns. The 10K prompt-injection test suite runs in CI on every PR. A single breach blocks the merge.
+Every PR body, issue body, and external contribution is scanned by the Red Queen Sentry (VDS 80000) for prompt injection and adversarial patterns. Standard CI checks (lint, type-check, unit tests) run on every PR. The injection scan silently drops malicious payloads.
 
 ### 6.2 GITHUB_TOKEN Read-Only for Untrusted-Input Workflows
 
@@ -207,7 +207,7 @@ pytest --cov=src/nousclaww --cov=src/sovereign_sockets
 docker build -t nousclaww-red-queen ./red_queen_sentry
 ```
 
-### Run Red Queen 10K test suite
+### Run Red Queen Sentry locally
 
 ```bash
 docker run --rm nousclaww-red-queen
