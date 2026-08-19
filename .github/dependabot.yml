@@ -1,0 +1,91 @@
+version: 2
+
+updates:
+  # Python dependencies (pyproject.toml)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "deps(pip):"
+      include: "scope"
+    reviewers:
+      - "nousloopsolutions"
+    groups:
+      dev-dependencies:
+        patterns:
+          - "pytest*"
+      scientific-stack:
+        patterns:
+          - "numpy*"
+          - "scikit-learn*"
+          - "scipy*"
+      web-stack:
+        patterns:
+          - "fastapi*"
+          - "uvicorn*"
+          - "httpx*"
+          - "pydantic*"
+
+  # Python dependencies (red_queen_sentry/requirements.txt)
+  - package-ecosystem: "pip"
+    directory: "/red_queen_sentry"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "python"
+      - "security"
+    commit-message:
+      prefix: "deps(sentry):"
+      include: "scope"
+    reviewers:
+      - "nousloopsolutions"
+
+  # Docker dependencies (red_queen_sentry/Dockerfile)
+  - package-ecosystem: "docker"
+    directory: "/red_queen_sentry"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "deps(docker):"
+      include: "scope"
+    reviewers:
+      - "nousloopsolutions"
+
+  # GitHub Actions dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "ci"
+    commit-message:
+      prefix: "deps(ci):"
+      include: "scope"
+    reviewers:
+      - "nousloopsolutions"
