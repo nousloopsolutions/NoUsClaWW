@@ -1,22 +1,7 @@
 # Red Queen Sentry - pinned dependencies
-# Hashes should be generated via: pip download --hashes-mode=sha256 -r requirements.txt
-# For now, pinned versions without hash verification (Dockerfile installs directly)
+# Only top-level packages pinned; transitive deps resolved by pip
 
 # Core scientific stack
 numpy==1.26.4
 scikit-learn==1.4.2
 pydantic==2.7.1
-
-# Transitive dependencies of scikit-learn
-scipy==1.13.0
-joblib==1.4.2
-threadpoolctl==3.4.0
-
-# Transitive dependencies of pydantic
-pydantic-core==2.18.4
-typing-extensions==4.11.0
-annotated-types==0.6.0
-
-# Transitive dependencies of numpy/scipy
-python-dateutil==2.9.0
-six==1.16.0
