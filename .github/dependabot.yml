@@ -1,0 +1,91 @@
+# Dependabot configuration for NoUsClaWW
+# Weekly updates on Monday 06:00 CST (12:00 UTC)
+
+version: 2
+updates:
+  # Python dependencies (root pyproject.toml)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "12:00"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "python"
+    reviewers:
+      - "nousloopsolutions"
+    commit-message:
+      prefix: "deps(python)"
+    groups:
+      dev-dependencies:
+        patterns:
+          - "pytest*"
+          - "black"
+          - "ruff"
+          - "mypy"
+      scientific:
+        patterns:
+          - "numpy"
+          - "scikit-learn"
+          - "scipy"
+      web:
+        patterns:
+          - "fastapi"
+          - "uvicorn"
+          - "httpx"
+          - "pydantic*"
+
+  # Python dependencies (red_queen_sentry)
+  - package-ecosystem: "pip"
+    directory: "/red_queen_sentry"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "12:00"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "python"
+      - "red-queen"
+    reviewers:
+      - "nousloopsolutions"
+    commit-message:
+      prefix: "deps(red-queen)"
+
+  # Docker dependencies
+  - package-ecosystem: "docker"
+    directory: "/red_queen_sentry"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "12:00"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "docker"
+    reviewers:
+      - "nousloopsolutions"
+    commit-message:
+      prefix: "deps(docker)"
+
+  # GitHub Actions dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "12:00"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    reviewers:
+      - "nousloopsolutions"
+    commit-message:
+      prefix: "deps(ci)"
