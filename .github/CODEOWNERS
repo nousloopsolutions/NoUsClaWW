@@ -1,0 +1,22 @@
+# CODEOWNERS for NoUsClaWW
+# These users are required reviewers for PRs touching the listed paths.
+
+# Default owner for everything
+*                           @nousloopsolutions
+
+# Security-critical: Red Queen Sentry
+/red_queen_sentry/          @nousloopsolutions
+
+# Security-critical: GitHub Actions workflows
+/.github/workflows/         @nousloopsolutions
+
+# Sovereign sockets — immutable interface, requires extra scrutiny
+/src/sovereign_sockets/     @nousloopsolutions
+
+# Documentation
+/docs/                      @nousloopsolutions
+/*.md                       @nousloopsolutions
+
+# CI/CD configuration
+/.github/                   @nousloopsolutions
+/pyproject.toml             @nousloopsolutions
