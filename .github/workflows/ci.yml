@@ -108,4 +108,4 @@ jobs:
                   print(f'DAG VIOLATION: {v}')
               sys.exit(1)
           print('OK: no cross-zone import violations')
-          " || true
+          "
