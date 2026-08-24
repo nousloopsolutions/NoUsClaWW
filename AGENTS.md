@@ -249,3 +249,11 @@ python -m nousclaww.sidecar.cli check-dag
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contributor guide |
 | [ATTRIBUTIONS.md](ATTRIBUTIONS.md) | Source project attributions |
 | [docs/RESEARCH/red-queen-results.md](docs/RESEARCH/red-queen-results.md) | Red Queen test iteration log |
+| [.nous-governance.md](.nous-governance.md) | Root governance charter |
+| [REVIEW.md](REVIEW.md) | Review protocol and verdict vocabulary |
+| [AGENT_SEPARATION_PROTOCOL.md](AGENT_SEPARATION_PROTOCOL.md) | Agent role isolation rules |
+| [AGENT_OPERATION_FLOW.md](AGENT_OPERATION_FLOW.md) | Step-by-step agent workflow |
+| [NOUS_AUTONOMOUS_PHASE_WORKFLOW.md](NOUS_AUTONOMOUS_PHASE_WORKFLOW.md) | Phase gate state machine |
+| [NOUS_INVARIANT.md](NOUS_INVARIANT.md) | Immutable invariants |
+| [NOUS_PROCESS_CHARTER.md](NOUS_PROCESS_CHARTER.md) | Process commitments |
+| [ARCHITECTURAL_GUARDRAILS_AI_GATEWAY.md](ARCHITECTURAL_GUARDRAILS_AI_GATEWAY.md) | AI gateway guardrails |
