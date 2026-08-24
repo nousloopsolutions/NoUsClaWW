@@ -58,7 +58,7 @@
 | INV-BP-2 | `alpha` requires 2 approving reviews | GitHub ruleset |
 | INV-BP-3 | Linear history required on `main` and `alpha` | GitHub ruleset |
 | INV-BP-4 | No force push to `main` or `alpha` | GitHub ruleset |
-| INV-BP-5 | All 3 CI checks required on `main` and `alpha` | GitHub ruleset |
+| INV-BP-5 | All 5 CI checks required on `main` and `alpha` | GitHub ruleset |
 | INV-BP-6 | Review thread resolution required | GitHub ruleset |
 
 ## 7. Agent Separation Invariants
