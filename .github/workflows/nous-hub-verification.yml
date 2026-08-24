@@ -9,9 +9,9 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
-  checks: write
-  issues: write
+  pull-requests: read
+  checks: none
+  issues: read
 
 jobs:
   agent-verification:
