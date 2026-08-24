@@ -88,7 +88,7 @@ The following files require explicit review and cannot be auto-merged:
 
 ### 4.1 Red Queen Sentry (VDS 80000)
 
-- 10,000 prompt injection attempts per CI run
+- Issues and PRs scanned for prompt injection
 - Zero breaches required (zero tolerance)
 - Docker container: `--network=none --read-only --memory=512m --cpus=1.0`
 - Non-root user (uid 10001), no sudo
