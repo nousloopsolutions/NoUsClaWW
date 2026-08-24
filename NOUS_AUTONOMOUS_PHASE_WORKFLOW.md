@@ -82,7 +82,7 @@ A deterministic readiness interrogator must fail closed unless all are true:
 - Adjudication runs after sealed reviews and returns `PASS_TO_NEXT_STAGE`
 - Branch protection/CODEOWNERS evidence matches live required contexts
 - Unresolved items are classified, owned, and either non-blocking or explicitly authorized for deferral
-- No agent has merged, enabled auto-merge, or posted `READY FOR MERGE`
+- No agent has merged or enabled auto-merge
 
 ## 8. Reviewer Independence
 
