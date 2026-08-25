@@ -277,6 +277,7 @@ LEVEL 2 (Services — depends on LEVEL 0, 1)
         ▼
 LEVEL 3 (Orchestration — depends on LEVEL 0, 1, 2)
 ├── src/nousclaww/agent/loop.py             # Mad-dog agent loop
+├── src/nousclaww/agent/task_loop.py        # Multi-step task loop (plan→act→observe→reflect)
 ├── src/nousclaww/agent/capability.py       # Capability evolution
 └── src/nousclaww/health/self_heal.py       # Self-healing orchestrator
         │
@@ -284,7 +285,12 @@ LEVEL 3 (Orchestration — depends on LEVEL 0, 1, 2)
 LEVEL 4 (Sidecar / CLI — depends on LEVEL 0, 1, 2, 3)
 ├── src/nousclaww/sidecar/server.py         # Loopback-only FastAPI sidecar
 ├── src/nousclaww/sidecar/cli.py            # nousclaww CLI entry point
-└── src/nousclaww/sidecar/profiler.py       # Model capability profiling
+├── src/nousclaww/sidecar/profiler.py       # Model capability profiling
+├── src/nousclaww/brain/                    # BrainInterface community impl (LocalOllamaBrain + SocketLoader)
+├── src/nousclaww/tools/                    # ToolRegistry + FileOps + ShellOps (control-flag gated)
+├── src/nousclaww/browser_control.py        # BrowserControl (Playwright, JS_EVAL gated)
+├── src/nousclaww/visage/                   # VisageHUD community impl (VisageInterface)
+└── src/nousclaww/archive/                  # R2Archive community impl (ArchiveInterface, AES-256-GCM)
         │
         ▼
 LEVEL 5 (Community Extensions — depends on sovereign sockets only)
@@ -304,6 +310,80 @@ LEVEL 6 (External / Proprietary — implements sovereign sockets)
 3. **Sovereign sockets are LEAF:** The contract layer has zero internal dependencies. It is the stable foundation.
 4. **Proprietary core is a sink:** It implements interfaces but is never imported by public code.
 5. **CI validates the DAG:** A dependency-graph check runs on every PR. Any violation fails the build.
+
+---
+
+## 6.5 Socket-Plugin Integration Layer (ADR-025)
+
+The socket-plugin integration layer provides community-side implementations of the sovereign socket interfaces, enabling the Nous MVP to load NoUsClaWW as a runtime plugin.
+
+### Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                     SOCKET-PLUGIN LAYER                              │
+│                                                                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────────────┐  │
+│  │ Brain Layer  │  │ Tool Layer   │  │ Affective + Archive Layer │  │
+│  │              │  │              │  │                           │  │
+│  │ LocalOllama  │  │ ToolRegistry │  │ VisageHUD (19 affects,    │  │
+│  │ Brain        │  │ FileOps      │  │   PII scrub, settling)    │  │
+│  │ SocketLoader │  │ ShellOps     │  │ R2Archive (AES-256-GCM,   │  │
+│  │              │  │              │  │   Merkle chain)           │  │
+│  └──────┬───────┘  └──────┬───────┘  └───────────┬───────────────┘  │
+│         │                 │                       │                  │
+│         │ implements      │ gated by              │ implements       │
+│         ▼                 ▼                       ▼                  │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │              SOVEREIGN SOCKET CONTRACTS                      │   │
+│  │  BrainInterface  ·  VisageInterface  ·  ArchiveInterface     │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+│                                                                      │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │                    TASK LOOP                                  │   │
+│  │  plan → act → observe → reflect (bounded, cancellable)       │   │
+│  │  Uses BrainInterface for planning/reflection                 │   │
+│  │  Uses ToolRegistry for action dispatch                       │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+│                                                                      │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │                    SIDECAR ENDPOINTS                          │   │
+│  │  POST /chat    — brain.reason()                              │   │
+│  │  POST /task    — TaskLoop.run()                              │   │
+│  │  GET  /tools   — ToolRegistry.list_tools()                   │   │
+│  │  POST /tools/dispatch — ToolRegistry.dispatch()              │   │
+│  │  GET  /visage/frame — VisageHUD.get_state()                  │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Control flags
+
+The socket-plugin layer extends the four original P1.7 controls with two new flags:
+
+| Flag | Gates | Default |
+|------|-------|---------|
+| `OBSERVE_ENABLED` | File reads, browser navigation | DISABLED |
+| `STORE_ENABLED` | File writes | DISABLED |
+| `INFER_ENABLED` | LLM reasoning | DISABLED |
+| `OUTPUT_ENABLED` | Output to user | DISABLED |
+| `JS_EVAL_ENABLED` | Browser JavaScript execution | DISABLED |
+| `SHELL_ENABLED` | Shell command execution | DISABLED |
+
+All flags default to DISABLED. The user must explicitly enable each flag before the corresponding tools can be dispatched.
+
+### Optional dependencies
+
+All socket-plugin capabilities that require external packages are guarded behind optional dependencies (AGENTS.md Section 4.4):
+
+| Capability | Optional dep | Extra |
+|-----------|-------------|-------|
+| LocalOllamaBrain | `ollama` | `local` |
+| BrowserControl | `playwright` | `browser` |
+| R2Archive | `cryptography` | `archive` |
+| R2 cloud sync | `httpx` | `cloud` |
+
+The test suite passes without any optional dependencies installed.
 
 ---
 

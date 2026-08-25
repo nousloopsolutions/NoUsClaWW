@@ -103,8 +103,14 @@ def check_dag(root: Path | None = None) -> list[str]:
 # ── Commands ──────────────────────────────────────────────────────────────
 
 
-def cmd_serve(_args: argparse.Namespace) -> int:
+def cmd_serve(args: argparse.Namespace) -> int:
     """Start the loopback-only sidecar server."""
+    # If --brain-path is provided, set it as an env var so the sidecar
+    # picks it up during initialisation.
+    if hasattr(args, "brain_path") and args.brain_path:
+        import os
+        os.environ["NOUS_BRAIN_PATH"] = args.brain_path
+
     from nousclaww.sidecar.server import main as server_main
 
     server_main()
@@ -200,9 +206,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit machine-readable JSON",
     )
 
-    sub.add_parser(
+    p_serve = sub.add_parser(
         "serve",
         help="Start the loopback-only sidecar HTTP server (127.0.0.1)",
+    )
+    p_serve.add_argument(
+        "--brain-path",
+        default=None,
+        help="Dotted path or manifest file for the brain implementation "
+             "(e.g. 'nousclaww.brain.local_ollama_brain:LocalOllamaBrain')",
     )
     return parser
 

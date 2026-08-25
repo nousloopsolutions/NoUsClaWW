@@ -604,6 +604,83 @@ class SidecarService:
                     f"Sidecar: mad-dog loop unavailable: {e}"
                 )
 
+        # Initialize brain (socket-plugin integration, optional)
+        self.brain: Any = None
+        try:
+            from nousclaww.brain.socket_loader import SocketLoader
+            brain_path = os.environ.get("NOUS_BRAIN_PATH", "")
+            if brain_path:
+                self.brain = SocketLoader().load(brain_path)
+            else:
+                # Default: try LocalOllamaBrain, degrade gracefully
+                try:
+                    from nousclaww.brain.local_ollama_brain import LocalOllamaBrain
+                    self.brain = LocalOllamaBrain()
+                except ImportError:
+                    pass  # ollama not installed — brain stays None
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"Sidecar: brain unavailable: {e}"
+            )
+
+        # Initialize tool registry (socket-plugin integration)
+        self.tool_registry: Any = None
+        try:
+            from nousclaww.tools.registry import ToolRegistry
+            from nousclaww.tools.file_ops import FileReadTool, FileWriteTool
+            from nousclaww.tools.shell_ops import ShellExecTool
+            from nousclaww.control_state import ControlFlag
+            if self.control_state is not None:
+                self.tool_registry = ToolRegistry(self.control_state)
+                self.tool_registry.register(
+                    "file_read", FileReadTool(),
+                    {ControlFlag.OBSERVE_ENABLED},
+                    "Read a file and return its contents.",
+                )
+                self.tool_registry.register(
+                    "file_write", FileWriteTool(),
+                    {ControlFlag.STORE_ENABLED},
+                    "Write content to a file.",
+                )
+                self.tool_registry.register(
+                    "shell_exec", ShellExecTool(),
+                    {ControlFlag.SHELL_ENABLED},
+                    "Execute a shell command and return output.",
+                )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"Sidecar: tool registry unavailable: {e}"
+            )
+
+        # Initialize task loop (socket-plugin integration, requires brain)
+        self.task_loop: Any = None
+        if self.brain is not None and self.tool_registry is not None:
+            try:
+                from nousclaww.agent.task_loop import TaskLoop
+                self.task_loop = TaskLoop(
+                    brain=self.brain,
+                    tools=self.tool_registry,
+                    max_steps=10,
+                )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(
+                    f"Sidecar: task loop unavailable: {e}"
+                )
+
+        # Initialize visage HUD (socket-plugin integration, optional)
+        self.visage: Any = None
+        try:
+            from nousclaww.visage.visage_hud import VisageHUD
+            self.visage = VisageHUD()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"Sidecar: visage HUD unavailable: {e}"
+            )
+
     # ── Core endpoints ────────────────────────────────────────────────────
 
     def health(self) -> APIResponse:
@@ -1283,6 +1360,164 @@ class SidecarService:
             duration_ms=(time.time() - start) * 1000,
         )
 
+    # ── Socket-plugin endpoints (chat, task, tools, visage) ───────────────
+
+    def chat(self, message: str) -> APIResponse:
+        """Chat endpoint — send a message to the brain and get a response.
+
+        Uses the BrainInterface implementation loaded at startup. If no
+        brain is available, returns an honest error.
+        """
+        start = time.time()
+        if self.brain is None:
+            return APIResponse(
+                ok=False,
+                error="Brain not available — set NOUS_BRAIN_PATH or install ollama",
+                duration_ms=(time.time() - start) * 1000,
+            )
+        try:
+            resp = self.brain.reason(context="", query=message, constraints={})
+            return APIResponse(
+                ok=True,
+                data={
+                    "output": resp.output,
+                    "confidence": resp.confidence,
+                    "void_sockets": resp.void_sockets,
+                    "metadata": resp.metadata,
+                },
+                duration_ms=(time.time() - start) * 1000,
+            )
+        except Exception as exc:
+            return APIResponse(
+                ok=False,
+                error=str(exc),
+                duration_ms=(time.time() - start) * 1000,
+            )
+
+    def task(self, task_description: str) -> APIResponse:
+        """Task endpoint — run a multi-step autonomous task.
+
+        Uses the TaskLoop to plan, act, observe, and reflect until the
+        task is complete or max_steps is reached.
+        """
+        start = time.time()
+        if self.task_loop is None:
+            return APIResponse(
+                ok=False,
+                error="Task loop not available — requires brain and tool registry",
+                duration_ms=(time.time() - start) * 1000,
+            )
+        try:
+            result = self.task_loop.run(task_description)
+            return APIResponse(
+                ok=True,
+                data={
+                    "task": result.task,
+                    "completed": result.completed,
+                    "cancelled": result.cancelled,
+                    "summary": result.summary,
+                    "step_count": len(result.steps),
+                    "elapsed_s": result.elapsed_s,
+                    "error": result.error,
+                    "steps": [
+                        {
+                            "step": s.step,
+                            "action": s.action,
+                            "observation": s.observation,
+                            "reflection": s.reflection,
+                            "done": s.done,
+                            "elapsed_s": s.elapsed_s,
+                        }
+                        for s in result.steps
+                    ],
+                },
+                duration_ms=(time.time() - start) * 1000,
+            )
+        except Exception as exc:
+            return APIResponse(
+                ok=False,
+                error=str(exc),
+                duration_ms=(time.time() - start) * 1000,
+            )
+
+    def tools_list(self) -> APIResponse:
+        """List all registered tools."""
+        start = time.time()
+        if self.tool_registry is None:
+            return APIResponse(
+                ok=False,
+                error="Tool registry not available",
+                duration_ms=(time.time() - start) * 1000,
+            )
+        tools = self.tool_registry.list_tools()
+        return APIResponse(
+            ok=True,
+            data=[
+                {
+                    "name": t.name,
+                    "description": t.description,
+                    "required_flags": [f.value for f in t.required_flags],
+                }
+                for t in tools
+            ],
+            duration_ms=(time.time() - start) * 1000,
+        )
+
+    def tools_dispatch(self, name: str, args: dict) -> APIResponse:
+        """Dispatch a tool call."""
+        start = time.time()
+        if self.tool_registry is None:
+            return APIResponse(
+                ok=False,
+                error="Tool registry not available",
+                duration_ms=(time.time() - start) * 1000,
+            )
+        try:
+            result = self.tool_registry.dispatch(name, **args)
+            return APIResponse(
+                ok=result.success,
+                data={
+                    "tool": result.tool,
+                    "output": result.output,
+                    "error": result.error,
+                },
+                error=result.error,
+                duration_ms=(time.time() - start) * 1000,
+            )
+        except Exception as exc:
+            return APIResponse(
+                ok=False,
+                error=str(exc),
+                duration_ms=(time.time() - start) * 1000,
+            )
+
+    def visage_frame(self) -> APIResponse:
+        """Return the current Visage HUD render state."""
+        start = time.time()
+        if self.visage is None:
+            return APIResponse(
+                ok=False,
+                error="Visage HUD not available",
+                duration_ms=(time.time() - start) * 1000,
+            )
+        state = self.visage.get_state()
+        return APIResponse(
+            ok=True,
+            data={
+                "render": state.render,
+                "spinner": state.spinner,
+                "face": state.face,
+                "object": state.object,
+                "status": state.status,
+                "cost": state.cost,
+                "affect": state.affect.label,
+                "affect_confidence": state.affect.confidence,
+                "elapsed_s": state.elapsed_s,
+                "frame_rate": state.frame_rate,
+            },
+            duration_ms=(time.time() - start) * 1000,
+        )
+
 
 def create_fastapi_app(service: SidecarService) -> "FastAPI":
     """Create a FastAPI app wrapping the sidecar service.
@@ -1497,6 +1732,45 @@ def create_fastapi_app(service: SidecarService) -> "FastAPI":
     async def shutdown(secret: str = Header(None, alias="X-NOUS-Secret")) -> APIResponse:
         verify_secret(secret)
         return service.shutdown()
+
+    # ── Socket-plugin endpoints ───────────────────────────────────────────
+    @app.post("/chat")
+    async def chat(
+        body: dict,
+        secret: str = Header(None, alias="X-NOUS-Secret"),
+    ) -> APIResponse:
+        verify_secret(secret)
+        message = body.get("message", "")
+        return service.chat(message)
+
+    @app.post("/task")
+    async def task(
+        body: dict,
+        secret: str = Header(None, alias="X-NOUS-Secret"),
+    ) -> APIResponse:
+        verify_secret(secret)
+        task_desc = body.get("task", "")
+        return service.task(task_desc)
+
+    @app.get("/tools")
+    async def tools_list(secret: str = Header(None, alias="X-NOUS-Secret")) -> APIResponse:
+        verify_secret(secret)
+        return service.tools_list()
+
+    @app.post("/tools/dispatch")
+    async def tools_dispatch(
+        body: dict,
+        secret: str = Header(None, alias="X-NOUS-Secret"),
+    ) -> APIResponse:
+        verify_secret(secret)
+        name = body.get("name", "")
+        args = body.get("args", {})
+        return service.tools_dispatch(name, args)
+
+    @app.get("/visage/frame")
+    async def visage_frame(secret: str = Header(None, alias="X-NOUS-Secret")) -> APIResponse:
+        verify_secret(secret)
+        return service.visage_frame()
 
     return app
 
