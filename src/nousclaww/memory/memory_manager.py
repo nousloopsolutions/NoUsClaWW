@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import json
 import logging
+import secrets
 import sqlite3
 import time
 from dataclasses import dataclass
@@ -175,7 +176,10 @@ class MemoryManager:
         return conn
 
     def _generate_id(self, prefix: str = "mem") -> str:
-        return f"{prefix}-{int(time.time())}-{hash(time.time()) % 100000}"
+        # Collision-resistant: timestamp + cryptographic randomness.
+        # (The previous hash(time.time()) scheme could collide within the
+        # same second and was salted per process.)
+        return f"{prefix}-{int(time.time())}-{secrets.token_hex(4)}"
 
     # ── Events ────────────────────────────────────────────────────────────
 
@@ -357,6 +361,32 @@ class MemoryManager:
                 (pattern, pattern, limit),
             ).fetchall()
             return [self._row_to_memory(r) for r in rows]
+
+    def recall(self, query: str, limit: int = 3) -> list[dict[str, Any]]:
+        """Recall memories relevant to *query* for context injection.
+
+        This is the retrieval entry point consumed by the AutoRecall hook
+        (``nousclaww.hooks.auto_recall.AutoRecall.inject``). It delegates to
+        :meth:`search_memories` — substring match ordered by importance and
+        access count. An empty or whitespace-only query returns no results.
+
+        Args:
+            query: The recall query string.
+            limit: Maximum number of memories to return.
+
+        Returns:
+            List of memory dicts, most relevant first. Empty list when the
+            query is empty or nothing matches.
+        """
+        if not query or not query.strip():
+            return []
+        try:
+            return self.search_memories(query.strip(), limit=limit)
+        except Exception:
+            # Retrieval must never break the caller's pipeline.
+            logger.debug("recall() retrieval failed for query %r", query,
+                         exc_info=True)
+            return []
 
     def update_importance(self, memory_id: str, delta: float) -> bool:
         """Adjust a memory's importance by delta, clamped to [0.0, 1.0].

@@ -22,7 +22,15 @@ SYNTH:
 
 import logging
 
-import ollama
+# ``ollama`` is an optional dependency (the ``local`` extra). The import is
+# guarded so the module — and its pure-Python abstention/fallback helpers —
+# remain usable without it (AGENTS.md Section 4.4, local-first rule).
+try:
+    import ollama
+    OLLAMA_AVAILABLE = True
+except ImportError:  # pragma: no cover - depends on environment
+    ollama = None
+    OLLAMA_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -264,7 +272,17 @@ class LLMInterface:
             host: Ollama server URL
             temperature: 0.0 = precise, 0.7 = balanced, 1.0 = creative
             max_tokens: Maximum response length
+
+        Raises:
+            ImportError: If the optional ``ollama`` package is not installed.
         """
+        if not OLLAMA_AVAILABLE:
+            raise ImportError(
+                "The 'ollama' package is required for LLMInterface but is not "
+                "installed. Install it with: pip install 'nousclaww[local]' "
+                "or pip install ollama. The deterministic fallback helpers "
+                "in this module work without it."
+            )
         self.model = model
         self.host = host
         self.temperature = temperature

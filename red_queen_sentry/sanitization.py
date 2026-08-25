@@ -101,6 +101,14 @@ _SYSTEM_OVERRIDE_PATTERNS = [
     re.compile(r"(?im)^\s*#{1,6}\s*Developer\s*:"),
     re.compile(r"(?im)^\s*#{1,6}\s*Forget\s+previous"),
     re.compile(r"(?im)^\s*#{1,6}\s*Ignore\s+(?:previous|all|the)"),
+    # Hardening: canonical bare override phrases anywhere in the text —
+    # not just at a line start with a markdown/bracket marker. Over-stripping
+    # is safe by design; under-stripping is a breach.
+    re.compile(
+        r"(?i)\bignore\s+(?:all|previous|the|any)\s+"
+        r"(?:previous\s+|prior\s+)?instructions?\b"
+    ),
+    re.compile(r"(?i)\bforget\s+(?:all|previous|the|any)\s+instructions\b"),
     # Helm / control token used as an override marker
     re.compile(r"\u2388"),
     # Common unicode-obfuscated "SYSTEM" variants (using confusables)

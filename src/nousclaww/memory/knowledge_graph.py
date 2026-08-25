@@ -31,6 +31,7 @@ SYNTH:
 from __future__ import annotations
 
 import logging
+import secrets
 import sqlite3
 import time
 from dataclasses import dataclass, field
@@ -146,7 +147,8 @@ class KnowledgeGraph:
         return conn
 
     def _generate_id(self, prefix: str = "ent") -> str:
-        return f"{prefix}-{int(time.time())}-{hash(time.time()) % 10000}"
+        # Collision-resistant: timestamp + cryptographic randomness.
+        return f"{prefix}-{int(time.time())}-{secrets.token_hex(4)}"
 
     # -- Entity CRUD -------------------------------------------------------
 

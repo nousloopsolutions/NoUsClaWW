@@ -47,5 +47,9 @@ Thumbs.db
 # Docker
 *.tar
 
+# Runtime databases created by sidecar/doctor in repo root
+/*.db
+/*.db-journal
+
 # Local scratch (never commit)
 .scratch/

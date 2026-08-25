@@ -118,15 +118,22 @@ class AgentLoop:
         epistemic_boundary: EpistemicBoundary,
         auto_recall: AutoRecall | None = None,
         autowrite: Autowrite | None = None,
+        default_confidence: float = 0.5,
     ) -> None:
         self.llm_router: LLMRouter = llm_router
         self.memory_manager: MemoryManager = memory_manager
         self.policy: CompressionPolicy = policy
         self.epistemic_boundary: EpistemicBoundary = epistemic_boundary
 
-        # Hooks — construct defaults if not provided
-        self.auto_recall: AutoRecall = auto_recall or AutoRecall(memory_manager)
-        self.autowrite: Autowrite = autowrite or Autowrite(memory_manager)
+        # Confidence reported to the epistemic boundary for each turn.
+        # Callers with a calibrated confidence source should override this;
+        # the default is deliberately conservative so uncalibrated output
+        # tends toward ANNOTATE (explicit caveats), not silent confidence.
+        self.default_confidence: float = default_confidence
+
+        # Hooks — construct defaults if not provided (both are no-arg)
+        self.auto_recall: AutoRecall = auto_recall or AutoRecall()
+        self.autowrite: Autowrite = autowrite or Autowrite()
 
         # Conversation history (list of message dicts)
         self._messages: list[dict[str, Any]] = []
@@ -213,7 +220,7 @@ class AgentLoop:
         intent = "unknown"
         try:
             intent = self.auto_recall.classify_intent(user_message)
-            recalled = self.auto_recall.recall(user_message, intent=intent)
+            recalled = self.auto_recall.inject(user_message, self.memory_manager)
             cost_log["intent"] = intent
             cost_log["recall_count"] = len(recalled)
             logger.debug("Auto-recall: intent=%s, %d memories", intent, len(recalled))
@@ -283,26 +290,45 @@ class AgentLoop:
             output = ""
         else:
             try:
-                boundary_result = self.epistemic_boundary.evaluate(
+                from nousclaww.epistemic_boundary import (
+                    EpistemicVerdict,
+                    get_refusal_message,
+                )
+
+                verdict = self.epistemic_boundary.evaluate(
                     llm_output,
+                    confidence=self.default_confidence,
+                    query_type=intent if intent else "general",
                     context={
-                        "intent": intent,
                         "user_message": user_message,
                         "routing": routing_meta,
                     },
                 )
-                if boundary_result.allowed:
-                    output = boundary_result.text
+                cost_log["boundary_confidence"] = self.default_confidence
+                if verdict == EpistemicVerdict.PASS:
+                    output = llm_output
                     boundary_verdict = "pass"
+                elif verdict == EpistemicVerdict.ANNOTATE:
+                    # Output proceeds but must carry an explicit caveat.
+                    caveat = (
+                        "(Caveat: confidence below threshold — verify this "
+                        "before relying on it.)"
+                    )
+                    output = f"{llm_output} {caveat}"
+                    boundary_verdict = "annotate"
                 else:
+                    # SHERLOCK / WAIT / RESEARCH / OBSERVE / SILENCE —
+                    # no fabricated content reaches the user. Use the
+                    # fixed refusal message; log the void.
                     output = ""
                     silenced = True
-                    boundary_verdict = boundary_result.reason or "blocked"
-                    logger.info("Epistemic boundary blocked output: %s", boundary_verdict)
+                    boundary_verdict = verdict.value
+                    cost_log["refusal_message"] = get_refusal_message(verdict)
+                    logger.info(
+                        "Epistemic boundary verdict %s — silence authorized",
+                        verdict.value,
+                    )
                 cost_log["boundary_verdict"] = boundary_verdict
-                cost_log["boundary_confidence"] = getattr(
-                    boundary_result, "confidence", None
-                )
             except Exception as e:
                 # If the boundary itself errors, fail safe: silence
                 output = ""
@@ -311,8 +337,11 @@ class AgentLoop:
                 cost_log["boundary_verdict"] = boundary_verdict
                 logger.warning("Epistemic boundary error: %s", e)
 
-        # ── Step 5: Autowrite ─────────────────────────────────────────────
-        # Record the turn (both user and assistant messages)
+        # ── Step 5: Record the turn ───────────────────────────────────────
+        # Chat turns are persisted as raw events so consolidation can later
+        # promote them through the memory tiers. (The Autowrite hook remains
+        # available for action-level significance recording — test runs,
+        # deploys, commits — which is a different lifecycle than chat.)
         assistant_msg: dict[str, Any] = {
             "role": "assistant",
             "content": output,
@@ -324,22 +353,24 @@ class AgentLoop:
         self._budget.add(output)
 
         try:
-            self.autowrite.record_turn(
-                user_message=user_message,
-                output=output,
-                metadata={
-                    "intent": intent,
-                    "routing": routing_meta,
-                    "boundary_verdict": boundary_verdict,
-                    "silenced": silenced,
-                    "recall_count": len(recalled),
-                    "context_tokens": self._budget.current_tokens,
-                },
+            self.memory_manager.add_event(
+                {
+                    "type": "chat_turn",
+                    "content": f"user: {user_message}\nassistant: {output}",
+                    "metadata": {
+                        "intent": intent,
+                        "routing": routing_meta,
+                        "boundary_verdict": boundary_verdict,
+                        "silenced": silenced,
+                        "recall_count": len(recalled),
+                        "context_tokens": self._budget.current_tokens,
+                    },
+                }
             )
             cost_log["autowrite"] = "recorded"
         except Exception as e:
             cost_log["autowrite_error"] = str(e)
-            logger.warning("Autowrite failed: %s", e)
+            logger.warning("Turn recording failed: %s", e)
 
         # ── Step 6: Assemble result ───────────────────────────────────────
         duration_ms = (time.time() - turn_start) * 1000
