@@ -189,6 +189,19 @@ No code path may deliver raw, un-scrubbed data to VDS 00000. All data must pass 
 pip install -e ".[dev]"
 ```
 
+With socket-plugin extras (brain, browser, archive, cloud):
+
+```bash
+pip install -e ".[dev,local,browser,archive,cloud]"
+```
+
+| Extra | Installs | Enables |
+|-------|----------|---------|
+| `local` | `ollama` | LocalOllamaBrain (local LLM reasoning) |
+| `browser` | `playwright` | BrowserControl (web automation) |
+| `archive` | `cryptography` | R2Archive (AES-256-GCM encrypted backup) |
+| `cloud` | `httpx` | Cloud sync for R2 archive |
+
 ### Run tests
 
 ```bash
@@ -225,6 +238,30 @@ npx wrangler deploy --dry-run
 ```bash
 python -m nousclaww.sidecar.cli check-dag
 ```
+
+### Start the sidecar with a specific brain (socket-plugin mode)
+
+```bash
+nousclaww serve --brain-path nousclaww.brain.local_ollama_brain:LocalOllamaBrain
+```
+
+Or via environment variable:
+
+```bash
+NOUS_BRAIN_PATH=nousclaww.brain.local_ollama_brain:LocalOllamaBrain nousclaww serve
+```
+
+### Socket-plugin sidecar endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/chat` | POST | Send a message to the brain, get a response |
+| `/task` | POST | Run a multi-step autonomous task (plan → act → observe → reflect) |
+| `/tools` | GET | List all registered tools and their required control flags |
+| `/tools/dispatch` | POST | Dispatch a specific tool call |
+| `/visage/frame` | GET | Get the current Visage HUD render state |
+
+All endpoints require the `X-NOUS-Secret` header for authentication.
 
 ---
 

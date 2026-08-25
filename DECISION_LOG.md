@@ -182,4 +182,38 @@
 
 ---
 
+## ADR-025: Socket-Plugin Integration — Community BrainInterface Implementation
+
+**Status:** Proposed (PR #24)
+**Date:** 2026-08-25
+
+**Context:** The Nous MVP needs to load NoUsClaWW as a socket plugin at runtime. The sovereign socket layer defines the `BrainInterface` contract, but no community-side implementation existed. Without a concrete brain, the MVP cannot reason, plan, or execute tasks — it can only send empty socket calls. Additionally, the MVP needs tool dispatch (file/shell/browser), multi-step task execution, an affective HUD (Visage), and encrypted disaster recovery (R2 Archive) — all gated behind user control flags.
+
+**Decision:** Implement community-side implementations of all sovereign socket interfaces used by the MVP:
+
+1. **`LocalOllamaBrain`** — wraps the existing `LLMInterface` to satisfy `BrainInterface`. Uses local Ollama for reasoning, heuristic confidence scoring, and void-socket logging for epistemic gaps.
+2. **`SocketLoader`** — resolves any brain implementation from a dotted path (`module:ClassName`) or JSON manifest file. The MVP passes the brain path via `NOUS_BRAIN_PATH` env var or `--brain-path` CLI flag.
+3. **`ToolRegistry`** — dispatches named tool calls to registered handlers, gated by `ControlState` flags. Includes `FileReadTool` (OBSERVE_ENABLED), `FileWriteTool` (STORE_ENABLED), and `ShellExecTool` (SHELL_ENABLED).
+4. **`TaskLoop`** — multi-step autonomous execution: plan → act → observe → reflect. Bounded by `max_steps`, cancellable externally.
+5. **`BrowserControl`** — Playwright wrapper gated by `JS_EVAL_ENABLED` and `OBSERVE_ENABLED`. Playwright is an optional dependency.
+6. **`VisageHUD`** — community `VisageInterface` with 19 affect labels, heuristic classification, PII scrubbing, and settling curve.
+7. **`R2Archive`** — community `ArchiveInterface` with AES-256-GCM encryption, Merkle chain verification, and graceful cloud degradation. `cryptography` is an optional dependency.
+8. **Extended `ControlState`** — added `JS_EVAL_ENABLED` and `SHELL_ENABLED` flags plus generic `can()` and `require()` methods. All defaults remain DISABLED.
+9. **New sidecar endpoints** — `/chat`, `/task`, `/tools`, `/tools/dispatch`, `/visage/frame`.
+
+**Consequences:**
+- The MVP can load NoUsClaWW as a socket plugin with a single `--brain-path` flag.
+- All new modules are community-zone code — they import only from `sovereign_sockets` and the standard library. No `proprietary_core` imports (DAG check passes).
+- All optional capabilities (browser, archive, cloud) are guarded behind optional dependencies. The test suite passes without them (AGENTS.md Section 4.4).
+- 85 new tests (265 total passing). The existing 180 tests from PR #23 are unaffected.
+- The `ControlState` now has 6 flags (was 4). The `__post_init__` validation iterates over `ControlFlag`, so the new flags are automatically validated.
+- The sidecar server initializes brain/tools/task_loop/visage lazily — if optional deps are missing, the subsystems degrade gracefully and the endpoints return honest errors.
+
+**Sources:**
+- Sovereign socket contracts: `src/sovereign_sockets/brain_interface.py`, `visage_interface.py`, `archive_interface.py`
+- Existing LLM interface: `src/nousclaww/llm_interface.py`
+- Control state model: `src/nousclaww/control_state.py` (P1.7)
+
+---
+
 *Future ADRs will be appended here. Each ADR must include context, decision, consequences, and status.*
