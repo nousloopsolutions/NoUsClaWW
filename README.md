@@ -53,6 +53,8 @@ The agent knows what it doesn't know. When confidence is low, the agent stays si
 - **Silence Protocol** — When the epistemic boundary evaluator scores confidence below threshold, the agent says nothing rather than guessing. Silence is a feature, not a bug.
 - **Session wipe (VDS 50000)** — Ruthless annihilation of all ephemeral state between tasks. No session bleed, no context leakage, no persistent caches.
 - **Open Core** — Community code is public and MIT-licensed. The proprietary reasoning core is separate. The sovereign socket layer defines the immutable contract between them.
+- **Socket-Plugin Integration** — NoUsClaWW can be loaded as a socket plugin by the Nous MVP. The `BrainInterface` implementation (`LocalOllamaBrain`) provides reasoning, confidence scoring, and void-socket logging. The `SocketLoader` resolves any brain implementation from a dotted path or manifest file. The `ToolRegistry` dispatches file/shell/browser tools gated by `ControlState` flags. The `TaskLoop` runs multi-step autonomous tasks (plan -> act -> observe -> reflect). The `VisageHUD` renders a one-line affective HUD. The `R2Archive` provides AES-256-GCM encrypted disaster recovery with Merkle chain verification.
+- **Extended Control Flags** — In addition to the original four controls (OBSERVE/STORE/INFER/OUTPUT), the socket-plugin integration adds `JS_EVAL_ENABLED` (gates browser JavaScript execution) and `SHELL_ENABLED` (gates shell command execution). All defaults remain DISABLED.
 
 ---
 
@@ -76,6 +78,19 @@ git clone https://github.com/NoUsLoopSolutions/NoUsClaWW.git
 cd NoUsClaWW
 pip install -e ".[dev]"
 ```
+
+Optional extras for socket-plugin features:
+
+```bash
+pip install -e ".[dev,local,browser,archive,cloud]"
+```
+
+| Extra | Installs | Enables |
+|-------|----------|---------|
+| `local` | `ollama` | LocalOllamaBrain (local LLM reasoning) |
+| `browser` | `playwright` | BrowserControl (web automation) |
+| `archive` | `cryptography` | R2Archive (AES-256-GCM encrypted backup) |
+| `cloud` | `httpx` | Cloud sync for R2 archive |
 
 ### Start Ollama
 

@@ -34,11 +34,19 @@ from enum import Enum
 
 
 class ControlFlag(Enum):
-    """The four independent user authority controls."""
+    """The independent user authority controls.
+
+    The first four (OBSERVE/STORE/INFER/OUTPUT) are the original P1.7
+    controls. JS_EVAL_ENABLED and SHELL_ENABLED are extended controls
+    added by the socket-plugin integration for browser and shell access.
+    All defaults remain DISABLED.
+    """
     OBSERVE_ENABLED = "OBSERVE_ENABLED"
     STORE_ENABLED = "STORE_ENABLED"
     INFER_ENABLED = "INFER_ENABLED"
     OUTPUT_ENABLED = "OUTPUT_ENABLED"
+    JS_EVAL_ENABLED = "JS_EVAL_ENABLED"
+    SHELL_ENABLED = "SHELL_ENABLED"
 
 
 # Default state: ALL DISABLED (no background observation until user enables)
@@ -47,6 +55,8 @@ DEFAULT_CONTROLS: dict[ControlFlag, bool] = {
     ControlFlag.STORE_ENABLED: False,
     ControlFlag.INFER_ENABLED: False,
     ControlFlag.OUTPUT_ENABLED: False,
+    ControlFlag.JS_EVAL_ENABLED: False,
+    ControlFlag.SHELL_ENABLED: False,
 }
 
 
@@ -96,6 +106,18 @@ class ControlState:
         """Check if a control flag is enabled."""
         return self._flags.get(flag, False)
 
+    def can(self, flag: ControlFlag) -> bool:
+        """Generic check: is this control flag enabled? Alias for is_enabled."""
+        return self.is_enabled(flag)
+
+    def require(self, flag: ControlFlag) -> None:
+        """Generic require: raise ControlStateError if flag is not enabled."""
+        if not self.is_enabled(flag):
+            raise ControlStateError(
+                f"{flag.value} is not set — operation requires this control. "
+                f"Use state.enable(ControlFlag.{flag.value}) to enable."
+            )
+
     # -- Convenience methods ------------------------------------------------
 
     def can_observe(self) -> bool:
@@ -113,6 +135,14 @@ class ControlState:
     def can_output(self) -> bool:
         """Can the system produce output to the user?"""
         return self.is_enabled(ControlFlag.OUTPUT_ENABLED)
+
+    def can_js_eval(self) -> bool:
+        """Can the system evaluate JavaScript in a browser context?"""
+        return self.is_enabled(ControlFlag.JS_EVAL_ENABLED)
+
+    def can_shell(self) -> bool:
+        """Can the system execute shell commands?"""
+        return self.is_enabled(ControlFlag.SHELL_ENABLED)
 
     # -- Require methods (raise if not enabled) -----------------------------
 
@@ -146,6 +176,22 @@ class ControlState:
             raise ControlStateError(
                 "OUTPUT_ENABLED is not set — cannot produce output to user. "
                 "Use state.enable(ControlFlag.OUTPUT_ENABLED) to enable."
+            )
+
+    def require_js_eval(self) -> None:
+        """Raise ControlStateError if JS_EVAL_ENABLED is not set."""
+        if not self.can_js_eval():
+            raise ControlStateError(
+                "JS_EVAL_ENABLED is not set — cannot evaluate JavaScript. "
+                "Use state.enable(ControlFlag.JS_EVAL_ENABLED) to enable."
+            )
+
+    def require_shell(self) -> None:
+        """Raise ControlStateError if SHELL_ENABLED is not set."""
+        if not self.can_shell():
+            raise ControlStateError(
+                "SHELL_ENABLED is not set — cannot execute shell commands. "
+                "Use state.enable(ControlFlag.SHELL_ENABLED) to enable."
             )
 
     # -- State inspection ---------------------------------------------------
