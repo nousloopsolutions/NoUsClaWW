@@ -57,6 +57,9 @@ jobs:
         run: |
           RESULTS_DIR="${RUNNER_TEMP:-/tmp}/rq-results"
           mkdir -p "$RESULTS_DIR"
+          # The container writes as uid 10001; the host dir is created by the
+          # runner user. Make the mount writable for the container side.
+          chmod 0777 "$RESULTS_DIR"
           docker run --rm \
             --network=none \
             --read-only \
