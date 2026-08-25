@@ -44,7 +44,6 @@ import sqlite3
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -363,6 +362,7 @@ class SessionDB:
                 "total_sessions": total,
                 "total_trajectory_entries": total_traj,
                 "by_outcome": {r["outcome"] or "unknown": r["c"] for r in by_outcome},
+                "by_tag": {r["tags"] or "untagged": r["c"] for r in by_tag_rows},
                 "fts_available": self._fts_available,
                 "db_path": self.db_path,
             }

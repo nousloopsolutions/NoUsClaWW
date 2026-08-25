@@ -5,4 +5,4 @@ COPY . /app/red_queen_sentry
 RUN useradd -u 10001 sentryuser && chown -R sentryuser:sentryuser /app
 USER sentryuser
 VOLUME ["/tmp"]
-ENTRYPOINT ["python", "/app/red_queen_sentry/mcts_evaluator.py"]
+CMD ["python", "/app/red_queen_sentry/mcts_evaluator.py"]

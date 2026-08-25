@@ -1,0 +1,110 @@
+name: Nous-Hub Agent Verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+# Honesty policy: this workflow verifies the agent-integrity subsystems.
+# Every pytest step is blocking — a failure here means the axiom-synth,
+# epistemic-boundary, fallacy, rigor, or sanitization layer regressed.
+# No `|| true`: silent green-on-red is an integrity violation.
+jobs:
+  agent-verification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONHASHSEED: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r red_queen_sentry/requirements.txt
+          pip install pytest
+
+      # Each step targets one integrity subsystem. All are blocking once the
+      # corresponding test file exists; a missing file is an explicit SKIP,
+      # never a silent pass.
+      - name: Axiom-synth loop integrity tests
+        run: |
+          FILES=""
+          for f in tests/test_axiom_synth.py tests/test_red_queen_sentry.py; do
+            [ -f "$f" ] && FILES="$FILES $f"
+          done
+          if [ -z "$FILES" ]; then echo "SKIP: no axiom-synth test files present yet"; exit 0; fi
+          PYTHONPATH=src:red_queen_sentry python -m pytest $FILES -v --tb=short
+
+      - name: Epistemic boundary + memory integrity tests
+        run: |
+          FILES=""
+          for f in tests/test_epistemic_boundary.py tests/test_session_db.py tests/test_sovereign_sockets.py; do
+            [ -f "$f" ] && FILES="$FILES $f"
+          done
+          if [ -z "$FILES" ]; then echo "SKIP: no epistemic/memory test files present yet"; exit 0; fi
+          PYTHONPATH=src python -m pytest $FILES -v --tb=short
+
+      - name: Verify DAG integrity (no cross-zone imports)
+        run: |
+          python -c "
+          import ast, os, sys
+          violations = []
+          for root, dirs, files in os.walk('src/community'):
+              for f in files:
+                  if f.endswith('.py'):
+                      path = os.path.join(root, f)
+                      with open(path) as fh:
+                          tree = ast.parse(fh.read())
+                      for node in ast.walk(tree):
+                          if isinstance(node, ast.ImportFrom) and node.module:
+                              if 'proprietary_core' in node.module:
+                                  violations.append(f'{path}: imports proprietary_core')
+                          elif isinstance(node, ast.Import):
+                              for alias in node.names:
+                                  if 'proprietary_core' in alias.name:
+                                      violations.append(f'{path}: imports proprietary_core')
+          if violations:
+              for v in violations:
+                  print(f'DAG VIOLATION: {v}')
+              sys.exit(1)
+          print('OK: no cross-zone import violations')
+          "
+
+      - name: Verify sovereign socket immutability (ADR check)
+        run: |
+          BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -n "$BASE" ] && git rev-parse --verify -q "$BASE" >/dev/null; then
+            CHANGES=$(git diff --name-only "$BASE" HEAD -- src/sovereign_sockets/ || echo "")
+            if [ -n "$CHANGES" ]; then
+              echo "REVIEW REQUIRED: sovereign_sockets modified — an ADR (new or amended) must accompany this change:"
+              echo "$CHANGES"
+              if ! git diff --name-only "$BASE" HEAD -- DECISION_LOG.md | grep -q .; then
+                echo "FAIL: sovereign sockets changed without any DECISION_LOG.md update"
+                exit 1
+              fi
+            fi
+            echo "OK: sovereign socket immutability check completed"
+          else
+            echo "OK: no base commit available — nothing to verify"
+          fi
+
+      - name: Full test suite
+        run: PYTHONPATH=src python -m pytest tests/ -v --tb=short
+
+      - name: Post verification summary
+        if: always()
+        run: |
+          echo "Nous-Hub Agent Verification: ${{ job.status }}"

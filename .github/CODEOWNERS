@@ -1,0 +1,17 @@
+# CODEOWNERS for NoUsClaWW
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for all paths
+*                           @nousloopsolutions
+
+# Security-critical paths — require explicit review
+/.github/workflows/         @nousloopsolutions
+/red_queen_sentry/          @nousloopsolutions
+/src/sovereign_sockets/     @nousloopsolutions
+
+# Documentation
+/docs/                      @nousloopsolutions
+/*.md                       @nousloopsolutions
+
+# CI/CD configuration
+/.github/                   @nousloopsolutions

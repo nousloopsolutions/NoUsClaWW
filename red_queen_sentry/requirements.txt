@@ -1,47 +1,7 @@
-# Red Queen Sentry - pinned dependencies with hashes
-# Hashes must be generated via: pip download --hashes-mode=sha256 -r requirements.txt
-# or individually via: pip hash <package-file>
-#
-# Usage: pip install --require-hashes -r requirements.txt
---require-hashes
+# Red Queen Sentry - pinned dependencies
+# Only top-level packages pinned; transitive deps resolved by pip
 
 # Core scientific stack
-numpy==1.26.4 \
-    --hash=sha256:REPLACE_WITH_REAL_HASH \
-    --hash=sha256:REPLACE_WITH_REAL_HASH
-scikit-learn==1.4.2 \
-    --hash=sha256:REPLACE_WITH_REAL_HASH \
-    --hash=sha256:REPLACE_WITH_REAL_HASH
-pydantic==2.7.1 \
-    --hash=sha256:REPLACE_WITH_REAL_HASH \
-    --hash=sha256:REPLACE_WITH_REAL_HASH
-
-# Transitive dependencies of scikit-learn
-scipy==1.13.0 \
-    --hash=sha256:REPLACE_WITH_REAL_HASH \
-    --hash=sha256:REPLACE_WITH_REAL_HASH
-joblib==1.4.2 \
-    --hash=sha256:REPLACE_WITH_REAL_HASH \
-    --hash=sha256:REPLACE_WITH_REAL_HASH
-threadpoolctl==3.4.0 \
-    --hash=sha256:REPLACE_WITH_REAL_HASH \
-    --hash=sha256:REPLACE_WITH_REAL_HASH
-
-# Transitive dependencies of pydantic
-pydantic-core==2.18.4 \
-    --hash=sha256:REPLACE_WITH_REAL_HASH \
-    --hash=sha256:REPLACE_WITH_REAL_HASH
-typing-extensions==4.11.0 \
-    --hash=sha256:REPLACE_WITH_REAL_HASH \
-    --hash=sha256:REPLACE_WITH_REAL_HASH
-annotated-types==0.6.0 \
-    --hash=sha256:REPLACE_WITH_REAL_HASH \
-    --hash=sha256:REPLACE_WITH_REAL_HASH
-
-# Transitive dependencies of numpy/scipy
-python-dateutil==2.9.0 \
-    --hash=sha256:REPLACE_WITH_REAL_HASH \
-    --hash=sha256:REPLACE_WITH_REAL_HASH
-six==1.16.0 \
-    --hash=sha256:REPLACE_WITH_REAL_HASH \
-    --hash=sha256:REPLACE_WITH_REAL_HASH
+numpy==1.26.4
+scikit-learn==1.4.2
+pydantic==2.7.1

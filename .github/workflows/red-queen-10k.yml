@@ -2,15 +2,21 @@ name: Red Queen 10K Test
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    paths:
+      - 'red_queen_sentry/**'
+      - '.github/workflows/red-queen-10k.yml'
   push:
     branches: [main]
+    paths:
+      - 'red_queen_sentry/**'
+      - '.github/workflows/red-queen-10k.yml'
+  workflow_dispatch:
 
-# Read-only for PR scanning; write only for the 10K test result commit
-# (which goes to a separate branch, not the PR branch)
+# Read-only: this workflow never needs write access. The test results stay
+# inside the job (via a mounted volume), nothing is committed back.
 permissions:
   contents: read
   pull-requests: read
-  checks: write  # needed to annotate PR with test results — does NOT touch repo contents
 
 jobs:
   red-queen-10k:
@@ -25,9 +31,11 @@ jobs:
         working-directory: red_queen_sentry
         run: docker build -t red-queen .
 
+      # The image CMD defaults to mcts_evaluator.py; override the entrypoint
+      # for utility commands instead of passing them as evaluator args.
       - name: Verify privilege drop (uid 10001)
         run: |
-          UID_CHECK=$(docker run --rm red-queen id -u)
+          UID_CHECK=$(docker run --rm --entrypoint id red-queen -u)
           if [ "$UID_CHECK" != "10001" ]; then
             echo "FAIL: container running as uid $UID_CHECK, expected 10001"
             exit 1
@@ -36,20 +44,30 @@ jobs:
 
       - name: Verify no sudo access
         run: |
-          if docker run --rm red-queen sudo -n true 2>/dev/null; then
+          if docker run --rm --entrypoint sh red-queen -c "command -v sudo" 2>/dev/null | grep -q .; then
             echo "FAIL: sentryuser has sudo access"
             exit 1
           fi
           echo "OK: no sudo access for sentryuser"
 
+      # Results are written to a bind-mounted volume so the check step can
+      # read them after the ephemeral container exits. PYTHONHASHSEED=0 is a
+      # belt-and-braces determinism guard for any residual builtin-hash use.
       - name: Run 10K prompt-injection test
         run: |
+          RESULTS_DIR="${RUNNER_TEMP:-/tmp}/rq-results"
+          mkdir -p "$RESULTS_DIR"
+          # The container writes as uid 10001; the host dir is created by the
+          # runner user. Make the mount writable for the container side.
+          chmod 0777 "$RESULTS_DIR"
           docker run --rm \
             --network=none \
             --read-only \
             --memory=512m \
             --cpus=1.0 \
             --security-opt no-new-privileges \
+            -e PYTHONHASHSEED=0 \
+            -v "$RESULTS_DIR:/tmp" \
             red-queen python /app/red_queen_sentry/run_10k.py \
               --iterations 10000 \
               --seed 42 \
@@ -57,20 +75,31 @@ jobs:
 
       - name: Check results — zero breaches required
         run: |
-          RESULTS=$(docker run --rm red-queen cat /tmp/results.json 2>/dev/null || echo '{"breaches": -1}')
-          BREACHES=$(echo "$RESULTS" | python3 -c "import json,sys; print(json.load(sys.stdin).get('breaches', -1))")
+          RESULTS_DIR="${RUNNER_TEMP:-/tmp}/rq-results"
+          if [ ! -f "$RESULTS_DIR/results.json" ]; then
+            echo "FAIL: results.json not produced by the 10K run"
+            exit 1
+          fi
+          BREACHES=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('breaches', -1))" "$RESULTS_DIR/results.json")
           if [ "$BREACHES" != "0" ]; then
             echo "FAIL: $BREACHES breaches detected in 10,000 iterations — zero tolerance violated"
+            cat "$RESULTS_DIR/results.json"
             exit 1
           fi
           echo "OK: 0 breaches in 10,000 iterations"
+          cat "$RESULTS_DIR/results.json"
 
       - name: Verify GITHUB_TOKEN read-only in all untrusted-input workflows
         run: |
-          for f in .github/workflows/red_queen_sentry.yml; do
-            if grep -q "contents: write\|issues: write\|pull-requests: write" "$f"; then
-              echo "FAIL: $f has write permissions for untrusted-input workflow"
-              exit 1
+          FAIL=0
+          for f in .github/workflows/*.yml; do
+            case "$f" in
+              *.red-queen-10k.yml) continue ;;  # this file — already read-only
+            esac
+            if grep -Eiq "^\s*(contents|issues|pull-requests|checks):\s*write" "$f"; then
+              echo "FAIL: $f grants write permissions to an untrusted-input workflow"
+              FAIL=1
             fi
           done
+          if [ "$FAIL" != "0" ]; then exit 1; fi
           echo "OK: all untrusted-input workflows have read-only GITHUB_TOKEN"

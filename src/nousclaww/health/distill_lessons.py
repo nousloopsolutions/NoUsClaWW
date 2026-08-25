@@ -38,7 +38,6 @@ import logging
 import re
 from typing import Any
 
-from nousclaww.memory.memory_manager import MemoryManager
 from nousclaww.llm_router import LLMRouter
 
 logger = logging.getLogger(__name__)

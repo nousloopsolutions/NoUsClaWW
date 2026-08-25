@@ -159,7 +159,7 @@ class TestStatsAndRecent:
     def test_get_stats_returns_counts(self, db):
         """get_stats should return total session and trajectory counts."""
         sid1 = db.create_session(title="Task 1")
-        sid2 = db.create_session(title="Task 2")
+        db.create_session(title="Task 2")
         db.add_trajectory_entry(sid1, {"step": 1})
         stats = db.get_stats()
         assert stats["total_sessions"] == 2
@@ -168,7 +168,7 @@ class TestStatsAndRecent:
 
     def test_get_recent_returns_latest_first(self, db):
         """get_recent should return sessions ordered by updated_at descending."""
-        sid1 = db.create_session(title="Old")
+        db.create_session(title="Old")
         time.sleep(0.01)
         sid2 = db.create_session(title="New")
         db.update_session(sid2, summary="updated")
