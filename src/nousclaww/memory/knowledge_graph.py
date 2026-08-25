@@ -302,6 +302,93 @@ class KnowledgeGraph:
                         queue.append((target_id, depth + 1, path + [entity_id]))
         return results
 
+    def personalized_pagerank(
+        self,
+        start_entity_ids: list[str],
+        damping: float = 0.85,
+        max_iterations: int = 100,
+        tolerance: float = 1e-8,
+    ) -> dict[str, float]:
+        """Personalized PageRank over the entity graph.
+
+        Random-walk with restart: the walker teleports back to the
+        personalization set (the given start entities) instead of a uniform
+        restart distribution. Deterministic power iteration — same graph
+        and parameters always yield identical scores.
+
+        Used for Phase 7 auto-recall: memories related (directly or
+        transitively) to the current query's entities rank higher.
+
+        Args:
+            start_entity_ids: Entity IDs forming the personalization set.
+            damping: Probability of following an edge vs teleporting [0,1).
+            max_iterations: Iteration cap for the power loop.
+            tolerance: Convergence threshold on the L1 score delta.
+
+        Returns:
+            Mapping of entity_id → PageRank score (sums to ~1.0). Isolated
+            start nodes retain their teleport mass.
+
+        Raises:
+            ValueError: If the personalization set is empty.
+        """
+        if not start_entity_ids:
+            raise ValueError(
+                "personalized_pagerank requires at least one start entity"
+            )
+        # Load the full directed adjacency (source -> targets).
+        adjacency: dict[str, list[str]] = {}
+        with self._get_conn() as conn:
+            entities = [
+                r["entity_id"]
+                for r in conn.execute("SELECT entity_id FROM entities").fetchall()
+            ]
+            edges = conn.execute(
+                "SELECT source_id, target_id FROM relationships "
+                "WHERE valid_to IS NULL"
+            ).fetchall()
+        node_set = set(entities) | set(start_entity_ids)
+        adjacency = {n: [] for n in node_set}
+        for e in edges:
+            src, dst = e["source_id"], e["target_id"]
+            if src in node_set and dst in node_set:
+                adjacency[src].append(dst)
+
+        personalization = {sid: 1.0 / len(start_entity_ids)
+                           for sid in set(start_entity_ids)}
+        scores: dict[str, float] = dict(personalization)
+        # Distribute initial mass uniformly across reachable nodes too.
+        if len(node_set) > len(scores):
+            uniform = 1.0 / len(node_set)
+            scores = {n: uniform for n in node_set}
+            for sid, mass in personalization.items():
+                scores[sid] += mass
+
+        out_degree = {n: len(adjacency[n]) for n in node_set}
+
+        for _ in range(max_iterations):
+            new_scores: dict[str, float] = {n: 0.0 for n in node_set}
+            for node in node_set:
+                if out_degree[node] == 0:
+                    continue  # dangling mass handled via teleport injection
+                share = scores[node] * damping / out_degree[node]
+                for target in adjacency[node]:
+                    new_scores[target] += share
+            # Teleport probability per step is (1 - damping); dangling-node
+            # mass also teleports back through the personalization set.
+            dangling_mass = sum(
+                scores[n] for n in node_set if out_degree[n] == 0
+            ) * damping
+            inject = (1.0 - damping) + dangling_mass
+            for sid in personalization:
+                new_scores[sid] += inject * personalization[sid]
+            delta = sum(abs(new_scores[n] - scores[n]) for n in node_set)
+            scores = new_scores
+            if delta < tolerance:
+                break
+
+        return scores
+
     # -- Temporal queries --------------------------------------------------
 
     def get_history(self, entity_id: str) -> list[dict[str, Any]]:

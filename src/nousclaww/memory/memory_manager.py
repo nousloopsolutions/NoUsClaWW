@@ -587,6 +587,69 @@ class MemoryManager:
 
     # ── Stats ─────────────────────────────────────────────────────────────
 
+    # ── Tiers (STM/MTM/LTM lifecycle) ─────────────────────────────────────
+
+    def get_tiers(self, now_offset_days: float = 0.0) -> dict[str, dict[str, Any]]:
+        """Return tier classification for every stored memory.
+
+        Delegates to :class:`nousclaww.memory.tiers.MemoryTiers`.
+
+        Returns:
+            Mapping of memory_id → {tier, importance, content, access_count}.
+        """
+        from nousclaww.memory.tiers import MemoryTiers
+
+        return MemoryTiers(self.db_path).get_tiers(now_offset_days=now_offset_days)
+
+    def touch_memory(self, memory_id: str) -> bool:
+        """Record an access to a memory (increments its access count).
+
+        Args:
+            memory_id: The memory that was recalled.
+
+        Returns:
+            True if the memory exists and was updated.
+        """
+        with self._get_conn() as conn:
+            cur = conn.execute(
+                "UPDATE memories SET access_count = access_count + 1, "
+                "last_accessed = ? WHERE memory_id = ?",
+                (time.time(), memory_id),
+            )
+            return cur.rowcount > 0
+
+    def promote_tiers(self) -> int:
+        """Apply tier promotions based on stored access counts.
+
+        Promotion rules live in
+        :mod:`nousclaww.memory.tiers`; this persists the resulting tier
+        label into the memories metadata for observability.
+
+        Returns:
+            The number of memories promoted out of their previous tier.
+        """
+        from nousclaww.memory.tiers import PROMOTE_TO_MTM, LTM_ACCESS_THRESHOLD, LTM_IMPORTANCE_FLOOR
+
+        promoted = 0
+        with self._get_conn() as conn:
+            rows = conn.execute(
+                "SELECT memory_id, importance, access_count FROM memories"
+            ).fetchall()
+            for row in rows:
+                if row["access_count"] >= LTM_ACCESS_THRESHOLD and row["importance"] >= LTM_IMPORTANCE_FLOOR:
+                    new_tier = "LTM"
+                elif row["access_count"] >= PROMOTE_TO_MTM:
+                    new_tier = "MTM"
+                else:
+                    continue
+                conn.execute(
+                    "UPDATE memories SET metadata = json_set(COALESCE(metadata, '{}'), "
+                    "'$.tier', ?) WHERE memory_id = ?",
+                    (new_tier, row["memory_id"]),
+                )
+                promoted += 1
+        return promoted
+
     def get_stats(self) -> dict[str, Any]:
         """Return summary statistics about the memory store."""
         with self._get_conn() as conn:
