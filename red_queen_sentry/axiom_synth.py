@@ -62,7 +62,6 @@ import hashlib
 import re
 import time
 from dataclasses import dataclass, field
-from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -563,7 +562,6 @@ def axiom_gate(intent: Intent) -> SynthBlock | None:
             )
 
         # Step 4: Anti-pattern check.
-        goal_lower = intent.stated_goal.lower()
         for ap in synth.anti_patterns:
             ap_tokens = _tokens(ap)
             if ap_tokens and _jaccard(intent_tokens, ap_tokens) > 0.5:
@@ -1195,11 +1193,9 @@ def axiom_loop(intent: Intent) -> tuple[ReflexResult, SynthBlock | None]:
     ref = reflex(intent.stated_goal, intent.target_file)
 
     # Layer 3: guardrail — the hard block.
-    blocked = False
     try:
         synth = axiom_gate(intent)
     except AxiomViolation:
-        blocked = True
         # Update integrity tracker before re-raising.
         if _current_tracker is not None:
             _current_tracker.check(

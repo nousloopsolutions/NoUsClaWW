@@ -36,7 +36,6 @@ import hashlib
 import json
 import os
 import platform
-import secrets
 import stat
 from pathlib import Path
 from typing import Any
@@ -443,7 +442,6 @@ class _LinuxBackend:
             KeyStorageError: If Secret Service is unavailable
         """
         try:
-            import secretstorage
             collection = self._get_collection()
             collection.create_item(
                 key_name,

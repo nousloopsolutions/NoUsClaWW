@@ -40,11 +40,11 @@ from __future__ import annotations
 
 import json
 import logging
+import secrets
 import sqlite3
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -183,7 +183,10 @@ class SessionDB:
     ) -> str:
         """Create a new session and return its ID."""
         if session_id is None:
-            session_id = f"sess-{int(time.time())}-{hash(time.time()) % 10000}"
+            # Collision-resistant: timestamp + cryptographic randomness.
+            # (The previous hash(time.time()) scheme could collide within
+            # the same second and was salted per process.)
+            session_id = f"sess-{int(time.time())}-{secrets.token_hex(4)}"
         now = datetime.now(timezone.utc).isoformat()
         with self._get_conn() as conn:
             conn.execute(
@@ -363,6 +366,7 @@ class SessionDB:
                 "total_sessions": total,
                 "total_trajectory_entries": total_traj,
                 "by_outcome": {r["outcome"] or "unknown": r["c"] for r in by_outcome},
+                "by_tag": {r["tags"] or "untagged": r["c"] for r in by_tag_rows},
                 "fts_available": self._fts_available,
                 "db_path": self.db_path,
             }

@@ -43,15 +43,24 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import List, Optional, Sequence, Tuple
+import zlib
+from typing import List, Optional, Sequence
 
 import numpy as np
 
 try:
-    from sklearn.covariance import MinCovDet
+    from sklearn.covariance import LedoitWolf, MinCovDet
     _HAS_SKLEARN = True
 except Exception:  # pragma: no cover - sklearn may be absent in minimal envs
     _HAS_SKLEARN = False
+
+# Above this dimensionality, MinCovDet is skipped in favor of Ledoit-Wolf
+# shrinkage. Rationale: the Minimum Covariance Determinant estimator requires
+# n_samples >> n_features^2 to be statistically meaningful, and its fitting
+# cost grows steeply with dimensionality (measured >100 s for a 60x128
+# baseline). Feature-hash vectors are high-dimensional by design, so the
+# robust-but-bounded Ledoit-Wolf estimate is the correct tool there.
+_MAX_MCD_DIM = 32
 
 
 # ---------------------------------------------------------------------------
@@ -87,15 +96,35 @@ class RedQueenAnomalyDetector:
 
         self.threshold_b = float(threshold_b)
 
-        # --- Fit robust covariance ---------------------------------------
-        if _HAS_SKLEARN and centroids.shape[0] >= 5:
+        # --- Fit covariance -----------------------------------------------
+        # MinCovDet when the regime suits it (low-dim, enough samples);
+        # Ledoit-Wolf shrunk empirical covariance for high-dim inputs;
+        # plain empirical covariance as last resort. All deterministic.
+        n_samples, n_features = centroids.shape
+        use_mcd = (
+            _HAS_SKLEARN
+            and n_samples >= 5
+            and n_features <= _MAX_MCD_DIM
+        )
+        self.cov_estimator = "empirical"
+        if use_mcd:
             try:
                 mcd = MinCovDet(random_state=42, support_fraction=0.75)
                 mcd.fit(centroids)
                 self.mu = np.asarray(mcd.location_, dtype=np.float64)
                 cov = np.asarray(mcd.covariance_, dtype=np.float64)
+                self.cov_estimator = "mincovdet"
             except Exception:
-                # Fall back to empirical estimate if MinCovDet fails.
+                self.mu = centroids.mean(axis=0)
+                cov = np.cov(centroids, rowvar=False)
+        elif _HAS_SKLEARN and n_samples >= 5:
+            try:
+                lw = LedoitWolf()
+                lw.fit(centroids)
+                self.mu = np.asarray(lw.location_, dtype=np.float64)
+                cov = np.asarray(lw.covariance_, dtype=np.float64)
+                self.cov_estimator = "ledoit_wolf"
+            except Exception:
                 self.mu = centroids.mean(axis=0)
                 cov = np.cov(centroids, rowvar=False)
         else:
@@ -300,27 +329,27 @@ class RedQueenAnomalyDetector:
 # ---------------------------------------------------------------------------
 
 def hash_vector(text: str, dim: int = 128) -> np.ndarray:
-    """Deterministic 128-D embedding from text via feature hashing.
+    """Deterministic embedding from text via feature hashing.
 
-    This is a lightweight stand-in for a real sentence embedding model,
-    suitable for the 10K iteration test where we need deterministic,
-    dependency-free vectors.
+    Uses CRC-32 so vectors are stable across processes, machines, and
+    PYTHONHASHSEED values (Python's builtin ``hash()`` is salted per
+    process and would make results irreproducible).
     """
     vec = np.zeros(dim, dtype=np.float64)
     if not text:
         return vec
-    # Hash each character trigram into a bucket; add +1/-1 via sign hash.
+    # Hash each character trigram into a bucket; add +1/-1 via sign bit.
     s = text.lower()
     tokens = [s[i:i + 3] for i in range(max(1, len(s) - 2))]
     for tok in tokens:
-        h = hash(tok)
-        bucket = abs(h) % dim
+        h = zlib.crc32(tok.encode("utf-8"))
+        bucket = h % dim
         sign = 1.0 if (h & 1) == 0 else -1.0
         vec[bucket] += sign
     # Also hash whole-word tokens for better separation.
     for word in s.split():
-        h = hash(word)
-        bucket = abs(h) % dim
+        h = zlib.crc32(word.encode("utf-8"))
+        bucket = h % dim
         vec[bucket] += 1.0 if (h & 1) == 0 else -1.0
     # L2 normalize.
     norm = np.linalg.norm(vec)

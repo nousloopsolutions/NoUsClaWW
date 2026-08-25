@@ -12,8 +12,6 @@ SYNTH:
 """
 import sys
 from pathlib import Path
-import sys
-from pathlib import Path
 
 # Add src to Python path so we can import nousclaww and sovereign_sockets
 src_path = Path(__file__).parent.parent / "src"

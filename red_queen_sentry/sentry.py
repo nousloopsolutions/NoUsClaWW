@@ -51,15 +51,11 @@ try:
     from .sanitization import (  # type: ignore
         sanitize,
         is_lethal_trifecta,
-        MAX_INPUT_LENGTHS,
         _SYSTEM_OVERRIDE_PATTERNS,
         _SHELL_COMMAND_PATTERNS,
-        _SENSITIVE_PATH_PATTERNS,
         _TOOL_REGISTRY_PATTERNS,
         _INVISIBLE_RE,
         _HTML_COMMENT_RE,
-        _PRIVATE_ACCESS_PATTERNS,
-        _EXTERNAL_ACTION_PATTERNS,
     )
     _PKG_IMPORT = True
 except Exception:
@@ -67,15 +63,11 @@ except Exception:
     from sanitization import (  # type: ignore
         sanitize,
         is_lethal_trifecta,
-        MAX_INPUT_LENGTHS,
         _SYSTEM_OVERRIDE_PATTERNS,
         _SHELL_COMMAND_PATTERNS,
-        _SENSITIVE_PATH_PATTERNS,
         _TOOL_REGISTRY_PATTERNS,
         _INVISIBLE_RE,
         _HTML_COMMENT_RE,
-        _PRIVATE_ACCESS_PATTERNS,
-        _EXTERNAL_ACTION_PATTERNS,
     )
 
 import re

@@ -33,6 +33,7 @@ SYNTH:
 
 from __future__ import annotations
 
+import secrets
 import subprocess
 import sys
 import time
@@ -67,7 +68,7 @@ class ProposalType(Enum):
 @dataclass
 class ImprovementProposal:
     """A proposed improvement to the system."""
-    proposal_id: str = field(default_factory=lambda: f"IMP-{int(time.time())}-{hash(time.time()) % 10000}")
+    proposal_id: str = field(default_factory=lambda: f"IMP-{int(time.time())}-{secrets.token_hex(4)}")
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     type: str = ProposalType.ADD_TEST.value
     status: str = ProposalStatus.PROPOSED.value

@@ -35,10 +35,10 @@ from __future__ import annotations
 
 import json
 import logging
+import secrets
 import sqlite3
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -176,7 +176,10 @@ class MemoryManager:
         return conn
 
     def _generate_id(self, prefix: str = "mem") -> str:
-        return f"{prefix}-{int(time.time())}-{hash(time.time()) % 100000}"
+        # Collision-resistant: timestamp + cryptographic randomness.
+        # (The previous hash(time.time()) scheme could collide within the
+        # same second and was salted per process.)
+        return f"{prefix}-{int(time.time())}-{secrets.token_hex(4)}"
 
     # ── Events ────────────────────────────────────────────────────────────
 
@@ -358,6 +361,32 @@ class MemoryManager:
                 (pattern, pattern, limit),
             ).fetchall()
             return [self._row_to_memory(r) for r in rows]
+
+    def recall(self, query: str, limit: int = 3) -> list[dict[str, Any]]:
+        """Recall memories relevant to *query* for context injection.
+
+        This is the retrieval entry point consumed by the AutoRecall hook
+        (``nousclaww.hooks.auto_recall.AutoRecall.inject``). It delegates to
+        :meth:`search_memories` — substring match ordered by importance and
+        access count. An empty or whitespace-only query returns no results.
+
+        Args:
+            query: The recall query string.
+            limit: Maximum number of memories to return.
+
+        Returns:
+            List of memory dicts, most relevant first. Empty list when the
+            query is empty or nothing matches.
+        """
+        if not query or not query.strip():
+            return []
+        try:
+            return self.search_memories(query.strip(), limit=limit)
+        except Exception:
+            # Retrieval must never break the caller's pipeline.
+            logger.debug("recall() retrieval failed for query %r", query,
+                         exc_info=True)
+            return []
 
     def update_importance(self, memory_id: str, delta: float) -> bool:
         """Adjust a memory's importance by delta, clamped to [0.0, 1.0].
@@ -557,6 +586,69 @@ class MemoryManager:
             return groups
 
     # ── Stats ─────────────────────────────────────────────────────────────
+
+    # ── Tiers (STM/MTM/LTM lifecycle) ─────────────────────────────────────
+
+    def get_tiers(self, now_offset_days: float = 0.0) -> dict[str, dict[str, Any]]:
+        """Return tier classification for every stored memory.
+
+        Delegates to :class:`nousclaww.memory.tiers.MemoryTiers`.
+
+        Returns:
+            Mapping of memory_id → {tier, importance, content, access_count}.
+        """
+        from nousclaww.memory.tiers import MemoryTiers
+
+        return MemoryTiers(self.db_path).get_tiers(now_offset_days=now_offset_days)
+
+    def touch_memory(self, memory_id: str) -> bool:
+        """Record an access to a memory (increments its access count).
+
+        Args:
+            memory_id: The memory that was recalled.
+
+        Returns:
+            True if the memory exists and was updated.
+        """
+        with self._get_conn() as conn:
+            cur = conn.execute(
+                "UPDATE memories SET access_count = access_count + 1, "
+                "last_accessed = ? WHERE memory_id = ?",
+                (time.time(), memory_id),
+            )
+            return cur.rowcount > 0
+
+    def promote_tiers(self) -> int:
+        """Apply tier promotions based on stored access counts.
+
+        Promotion rules live in
+        :mod:`nousclaww.memory.tiers`; this persists the resulting tier
+        label into the memories metadata for observability.
+
+        Returns:
+            The number of memories promoted out of their previous tier.
+        """
+        from nousclaww.memory.tiers import PROMOTE_TO_MTM, LTM_ACCESS_THRESHOLD, LTM_IMPORTANCE_FLOOR
+
+        promoted = 0
+        with self._get_conn() as conn:
+            rows = conn.execute(
+                "SELECT memory_id, importance, access_count FROM memories"
+            ).fetchall()
+            for row in rows:
+                if row["access_count"] >= LTM_ACCESS_THRESHOLD and row["importance"] >= LTM_IMPORTANCE_FLOOR:
+                    new_tier = "LTM"
+                elif row["access_count"] >= PROMOTE_TO_MTM:
+                    new_tier = "MTM"
+                else:
+                    continue
+                conn.execute(
+                    "UPDATE memories SET metadata = json_set(COALESCE(metadata, '{}'), "
+                    "'$.tier', ?) WHERE memory_id = ?",
+                    (new_tier, row["memory_id"]),
+                )
+                promoted += 1
+        return promoted
 
     def get_stats(self) -> dict[str, Any]:
         """Return summary statistics about the memory store."""

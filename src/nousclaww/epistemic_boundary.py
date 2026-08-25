@@ -1062,7 +1062,7 @@ class SilenceEventLog:
 
 
 class DangerConeRegistry:
-    """Registry of danger cones for hallucination detection and redirect.
+    r"""Registry of danger cones for hallucination detection and redirect.
 
     Danger cones encode known bad patterns as (name, patterns, redirect)
     tuples. When text matches a cone's patterns, the cone provides a
