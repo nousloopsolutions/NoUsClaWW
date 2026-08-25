@@ -46,3 +46,6 @@ Thumbs.db
 
 # Docker
 *.tar
+
+# Local scratch (never commit)
+.scratch/

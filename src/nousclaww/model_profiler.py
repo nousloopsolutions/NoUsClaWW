@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict
 from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)

@@ -10,13 +10,17 @@ on:
 permissions:
   contents: read
   pull-requests: read
-  checks: none
-  issues: read
 
+# Honesty policy: this workflow verifies the agent-integrity subsystems.
+# Every pytest step is blocking — a failure here means the axiom-synth,
+# epistemic-boundary, fallacy, rigor, or sanitization layer regressed.
+# No `|| true`: silent green-on-red is an integrity violation.
 jobs:
   agent-verification:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      PYTHONHASHSEED: '0'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,30 +36,26 @@ jobs:
           pip install -r red_queen_sentry/requirements.txt
           pip install pytest
 
-      - name: Run axiom-synth loop integrity tests
+      # Each step targets one integrity subsystem. All are blocking once the
+      # corresponding test file exists; a missing file is an explicit SKIP,
+      # never a silent pass.
+      - name: Axiom-synth loop integrity tests
         run: |
-          python -m pytest tests/test_axiom_synth.py -v --tb=short || true
-          echo "axiom-synth tests completed"
+          FILES=""
+          for f in tests/test_axiom_synth.py tests/test_red_queen_sentry.py; do
+            [ -f "$f" ] && FILES="$FILES $f"
+          done
+          if [ -z "$FILES" ]; then echo "SKIP: no axiom-synth test files present yet"; exit 0; fi
+          PYTHONPATH=src:red_queen_sentry python -m pytest $FILES -v --tb=short
 
-      - name: Run epistemic boundary tests
+      - name: Epistemic boundary + memory integrity tests
         run: |
-          python -m pytest tests/test_epistemic_boundary.py -v --tb=short || true
-          echo "epistemic boundary tests completed"
-
-      - name: Run fallacy compendium tests
-        run: |
-          python -m pytest tests/test_fallacy_compendium.py -v --tb=short || true
-          echo "fallacy compendium tests completed"
-
-      - name: Run scientific rigor tests
-        run: |
-          python -m pytest tests/test_scientific_rigor.py -v --tb=short || true
-          echo "scientific rigor tests completed"
-
-      - name: Run sanitization tests
-        run: |
-          python -m pytest tests/test_sanitization.py -v --tb=short || true
-          echo "sanitization tests completed"
+          FILES=""
+          for f in tests/test_epistemic_boundary.py tests/test_session_db.py tests/test_sovereign_sockets.py; do
+            [ -f "$f" ] && FILES="$FILES $f"
+          done
+          if [ -z "$FILES" ]; then echo "SKIP: no epistemic/memory test files present yet"; exit 0; fi
+          PYTHONPATH=src python -m pytest $FILES -v --tb=short
 
       - name: Verify DAG integrity (no cross-zone imports)
         run: |
@@ -81,31 +81,30 @@ jobs:
                   print(f'DAG VIOLATION: {v}')
               sys.exit(1)
           print('OK: no cross-zone import violations')
-          " || echo "DAG check skipped (src/community may not exist yet)"
+          "
 
-      - name: Verify sovereign socket immutability
+      - name: Verify sovereign socket immutability (ADR check)
         run: |
-          if [ -d "src/sovereign_sockets" ]; then
-            CHANGES=$(git diff --name-only HEAD~1 HEAD -- src/sovereign_sockets/ 2>/dev/null || echo "")
+          BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -n "$BASE" ] && git rev-parse --verify -q "$BASE" >/dev/null; then
+            CHANGES=$(git diff --name-only "$BASE" HEAD -- src/sovereign_sockets/ || echo "")
             if [ -n "$CHANGES" ]; then
-              echo "WARNING: sovereign_sockets modified — ADR required"
-              echo "Files changed: $CHANGES"
+              echo "REVIEW REQUIRED: sovereign_sockets modified — an ADR (new or amended) must accompany this change:"
+              echo "$CHANGES"
+              if ! git diff --name-only "$BASE" HEAD -- DECISION_LOG.md | grep -q .; then
+                echo "FAIL: sovereign sockets changed without any DECISION_LOG.md update"
+                exit 1
+              fi
             fi
-            echo "OK: sovereign socket check completed"
+            echo "OK: sovereign socket immutability check completed"
           else
-            echo "OK: src/sovereign_sockets does not exist yet — nothing to verify"
+            echo "OK: no base commit available — nothing to verify"
           fi
 
-      - name: Run full test suite
-        run: |
-          python -m pytest tests/ -v --tb=short || true
-          echo "full test suite completed"
+      - name: Full test suite
+        run: PYTHONPATH=src python -m pytest tests/ -v --tb=short
 
       - name: Post verification summary
         if: always()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const conclusion = '${{ job.status }}' === 'success' ? 'success' : 'failure';
-            core.info(`Nous-Hub Agent Verification: ${conclusion}`);
-            core.setOutput('conclusion', conclusion);
+        run: |
+          echo "Nous-Hub Agent Verification: ${{ job.status }}"

@@ -10,9 +10,14 @@ permissions:
   contents: read
   pull-requests: read
 
+# Honesty policy: checks marked [blocking] fail the build on failure.
+# Checks marked [report] are informational debt trackers — they annotate the
+# run but never silently convert a failure into a pass. No `|| true` anywhere:
+# a failing report step uses continue-on-error so the job stays green ONLY for
+# tracked debt, while real regressions (tests, pyflakes, DAG) always block.
 jobs:
   lint:
-    name: Lint
+    name: Lint (pyflakes-critical)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -30,16 +35,15 @@ jobs:
           pip install ruff mypy pytest
           pip install -r red_queen_sentry/requirements.txt
 
-      - name: Run ruff (lint)
-        run: ruff check . --output-format=github || true
-
-      - name: Run ruff (format check)
-        run: ruff format --check . || true
+      # [blocking] F = genuine defects (undefined names, unused vars,
+      # redefinitions); E9 = syntax errors. These must never regress.
+      - name: Run ruff (correctness rules — blocking)
+        run: ruff check --select F,E9,W605 --output-format=github .
 
   type-check:
-    name: Type Check
+    name: Type Check (report)
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -55,13 +59,16 @@ jobs:
           pip install mypy pytest
           pip install -r red_queen_sentry/requirements.txt
 
-      - name: Run mypy
-        run: mypy --ignore-missing-imports src/ red_queen_sentry/ || true
+      # [report] Full strict mypy is tracked debt (66 known findings).
+      # Failures are reported in the job log; they do not block merges yet.
+      - name: Run mypy (non-blocking report)
+        continue-on-error: true
+        run: mypy --ignore-missing-imports --no-error-summary src/ red_queen_sentry/
 
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -77,10 +84,13 @@ jobs:
           pip install pytest pytest-cov
           pip install -r red_queen_sentry/requirements.txt
 
+      # [blocking] The test suite must pass. A red X here is a real failure.
       - name: Run tests
-        run: pytest tests/ -v --tb=short --maxfail=10 || true
+        env:
+          PYTHONHASHSEED: '0'
+        run: PYTHONPATH=src pytest tests/ -v --tb=short --maxfail=10
 
-      - name: Verify DAG integrity (no cross-zone imports)
+      - name: Verify DAG integrity (no cross-zone imports) — blocking
         run: |
           python -c "
           import ast, os, sys

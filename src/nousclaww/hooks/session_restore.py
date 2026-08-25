@@ -40,7 +40,6 @@ No model cooperation required — the entire reconstruction is deterministic.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -213,7 +212,6 @@ class SessionRestore:
 
         for mem in reversed(recent):
             turn_type = mem.get("turn_type", "")
-            action = mem.get("action", "")
 
             # If last action was an edit, likely about to test
             if turn_type == "edit" and "run tests" not in about_to_do:

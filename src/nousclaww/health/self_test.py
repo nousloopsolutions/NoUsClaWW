@@ -40,11 +40,10 @@ SYNTH:
 from __future__ import annotations
 
 import logging
-import re
 from typing import Any
 
 from nousclaww.memory.memory_manager import MemoryManager
-from nousclaww.text_match import tokenize, distinctive_tokens
+from nousclaww.text_match import distinctive_tokens
 
 logger = logging.getLogger(__name__)
 

@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import ast
 import importlib
-import os
 import subprocess
 import sys
 from pathlib import Path

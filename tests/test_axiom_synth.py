@@ -12,7 +12,6 @@ SYNTH:
         - Tests that mask failures with overly permissive assertions.
         - Skipping tests to make the suite look green.
 """
-import os
 import sys
 from pathlib import Path
 
@@ -24,18 +23,10 @@ if str(_rqs) not in sys.path:
 import pytest
 from axiom_synth import (
     axiom_loop, axiom_gate, axiom_context, axiom_keys, acknowledge,
-    parse_synth_block, reflex, Intent, SynthBlock,
-    IntegrityTracker, start_task, current_tracker,
-    integrity_bar, integrity_report, record_user_signal,
-    AxiomViolation, pursue, PursueResult, report_exhaustion,
+    parse_synth_block, reflex, Intent, IntegrityTracker, start_task, current_tracker,
+    integrity_bar, AxiomViolation, pursue, report_exhaustion,
     USER_SIGNAL_ACK, USER_SIGNAL_CORNER, USER_SIGNAL_THOROUGH,
-    USER_SIGNAL_PUSHBACK, USER_SIGNAL_INFO, USER_SIGNAL_NEUTRAL,
-    _sigmoid, _log_odds_to_pct, _tokens, _jaccard, _stem,
-    _LLR_AXIOM_ALIGNED, _LLR_SPECULATIVE, _LLR_VALIDATION,
-    _LLR_OMISSION, _LLR_SHORTCUT, _LLR_BLOCKED, _LLR_UNEASE,
-    _LLR_HONEST_UNCERTAINTY,
-    _LLR_USER_ACK, _LLR_USER_CORNER, _LLR_USER_THOROUGH,
-    _LLR_USER_PUSHBACK, _LLR_USER_INFO,
+    USER_SIGNAL_PUSHBACK, _sigmoid, _log_odds_to_pct, _tokens, _jaccard, _stem,
 )
 
 SANITIZATION_FILE = str(_rqs / "sanitization.py")

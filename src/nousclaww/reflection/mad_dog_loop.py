@@ -796,7 +796,6 @@ class MadDogLoop:
         """
         proposal_id = proposal.get("proposal_id", "unknown")
         target_file = proposal.get("target_file", "")
-        proposed_change = proposal.get("proposed_change", "")
 
         result: dict[str, Any] = {
             "proposal_id": proposal_id,

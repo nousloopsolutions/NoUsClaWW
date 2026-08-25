@@ -43,16 +43,16 @@ import argparse
 import json
 import os
 import sys
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 # Robust imports (work as package or script).
 try:
     from .payloads import generate_all, generate_benign, ALL_ATTACK_CLASSES
-    from .sanitization import sanitize, MAX_INPUT_LENGTHS
+    from .sanitization import sanitize
     from .mcts_evaluator import RedQueenAnomalyDetector, hash_vector
 except Exception:
     from payloads import generate_all, generate_benign, ALL_ATTACK_CLASSES
-    from sanitization import sanitize, MAX_INPUT_LENGTHS
+    from sanitization import sanitize
     from mcts_evaluator import RedQueenAnomalyDetector, hash_vector
 
 import numpy as np

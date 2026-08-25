@@ -1076,7 +1076,7 @@ class DangerConeRegistry:
         registry = DangerConeRegistry()
         registry.add_cone(
             name="fabricated_dates",
-            patterns=[r"\b(19|20)\d{2}-\d{2}-\d{2}\b"],
+            patterns=[r"\b(19|20)\\d{2}-\\d{2}-\\d{2}\b"],
             redirect="Do not generate dates without evidence.",
         )
         result = registry.check_text("The event was on 2026-13-45.")
